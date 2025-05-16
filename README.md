@@ -9,3 +9,7 @@
 # sleepy🥱😪
 
 life
+
+# Keep Updating to github
+# git commands
+git clone "source" "folder in computer"
