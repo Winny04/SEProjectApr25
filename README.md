@@ -2,7 +2,7 @@
 Has no user login or role differentiation (Product Owner vs Admin),
 No separate pending queue or approval step,
 Barcode generation is standalone, based on whatever data is currently loaded.
-# By boon, (later i go back home continue.....)
+By boon, (later i go back home continue.....)
 
 
 
