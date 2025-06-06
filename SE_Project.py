@@ -101,17 +101,6 @@ class ShelfLifeApp:
         self.status_label = tk.Label(self.root, text="Load a file to get started.", anchor='w')
         self.status_label.pack(fill=tk.X, padx=10, pady=5)
 
-    def setup_treeview(self):
-        self.tree = ttk.Treeview(self.root, columns=COLUMNS, show="headings")
-        for col in COLUMNS:
-            self.tree.heading(col, text=col)
-            self.tree.column(col, width=140)
-        self.tree.pack(fill=tk.BOTH, expand=True)
-        self.tree.tag_configure("Pending", background="#e0e0e0")
-        self.tree.tag_configure("Expired", background="#ffcccc")
-        self.tree.tag_configure("Expiring", background="#ffe0b2")
-        self.tree.tag_configure("Active", background="#ccffcc")
-
     def import_excel(self):
         filetypes = (("Excel files", "*.xlsx *.xls"), ("All files", "*.*"))
         filename = filedialog.askopenfilename(title="Open Excel file", filetypes=filetypes)
