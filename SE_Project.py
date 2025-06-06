@@ -6,8 +6,6 @@ import barcode
 from barcode.writer import ImageWriter
 import os
 
-from shelf_life_management import LoginScreen
-
 # Constants
 NOTIFICATION_DAYS_BEFORE = 60  # 2 months approx.
 
