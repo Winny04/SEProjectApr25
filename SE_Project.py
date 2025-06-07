@@ -23,26 +23,48 @@ class LoginScreen:
         self.root = root
         self.on_login = on_login
         self.root.title("Login - Shelf-life Study System")
-        self.root.geometry("300x180")
+        self.root.geometry("320x180")
+        self.root.resizable(False, False)
 
-        tk.Label(root, text="Username:").pack(pady=5)
+        # Create and place username label and entry
+        tk.Label(root, text="Username:").grid(row=0, column=0, padx=10, pady=10, sticky="e")
         self.username_entry = tk.Entry(root)
-        self.username_entry.pack()
+        self.username_entry.grid(row=0, column=1, padx=10, pady=10)
 
-        tk.Label(root, text="Password:").pack(pady=5)
+        # Create and place password label and entry
+        tk.Label(root, text="Password:").grid(row=1, column=0, padx=10, pady=10, sticky="e")
         self.password_entry = tk.Entry(root, show="*")
-        self.password_entry.pack()
+        self.password_entry.grid(row=1, column=1, padx=10, pady=10)
 
-        tk.Button(root, text="Login", command=self.login).pack(pady=10)
+        # Create and place login button
+        tk.Button(root, text="Login", width=10, command=self.login).grid(row=2, column=1, pady=10, sticky="e")
+
+        # Label to show login status (e.g., error messages)
         self.status_label = tk.Label(root, text="", fg="red")
-        self.status_label.pack()
+        self.status_label.grid(row=3, column=0, columnspan=2)
 
-    def login(self):
+        def login(self):
         username = self.username_entry.get().strip()
         password = self.password_entry.get().strip()
+
+        # Check if username or password is empty
+        if not username and not password:
+            self.status_label.config(text="Please enter username and password.")
+            return
+        elif username and not password:
+            self.status_label.config(text="Please enter your password.")
+            return
+        elif not username and password:
+            self.status_label.config(text="Please enter your username.")
+            return
+
         user = USERS.get(username)
-        if user and user["password"] == password:
-            self.on_login(username, user["role"])
+
+        if user:
+            if user["password"] == password:
+                self.on_login(username, user["role"])
+            else:
+                self.status_label.config(text="Incorrect password. Please try again.")
         else:
             self.status_label.config(text="Invalid username or password.")
 
