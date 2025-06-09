@@ -1,8 +1,13 @@
 # firebase link（database）： https://console.firebase.google.com/u/0/project/seprojectapr25/firestore/databases/-default-/data
 have two document(users for signup and login) & (add new batches)
 
+
+# Login page
+additional:
+forget pass
+
 # DONE Admin
-Button/Function: Add new user, delete user, edit user, Approve sample
+Button/Function: Add new user, delete user, edit user, Approve & Reject sample
 
 
 # DONE User(Product Owner)
@@ -12,6 +17,11 @@ Add new batch: product id:, product name:, product description:, test date:
 # NOT YET DONE
 -> Edit batch
 *Reminder email send to everyone
+additinal: 
+test date select calendar date, no enter the date
+tab menu flow admin
+do not auto export aprroved excel file
+
 
 # Tester
 # NOT YET DONE
