@@ -4,69 +4,31 @@ import pandas as pd
 from datetime import datetime, timedelta
 import barcode
 from barcode.writer import ImageWriter
-import os
+import os, re
+import firebase_admin
+from firebase_admin import credentials, firestore
 
+# ---------------- FIREBASE SETUP ----------------
+cred = credentials.Certificate("firebase_config.json")  # TODO: put your path here
+firebase_admin.initialize_app(cred)
+db = firestore.client()
+
+# ---------------- CONSTANTS ----------------
+EMAIL_REGEX = re.compile(r"[^@]+@[^@]+\.[^@]+")
+MIN_PASSWORD_LENGTH = 6
 # Constants
 NOTIFICATION_DAYS_BEFORE = 60  # 2 months approx.
 
-USERS = {
-    "admin": {"password": "admin123", "role": "Admin"},
-    "owner": {"password": "owner123", "role": "ProductOwner"},
-    "bob": {"password": "bob123", "role": "ProductOwner"}
-}
+
+# ---------------- HELPERS ----------------
+def validate_email(email):
+    return EMAIL_REGEX.match(email) is not None
+
+
+def validate_password(password):
+    return len(password) >= MIN_PASSWORD_LENGTH
 
 COLUMNS = ["SampleID", "Owner", "MaturationDate", "Status"]
-
-# --- Login Window ---
-class LoginScreen:
-    def __init__(self, root, on_login):
-        self.root = root
-        self.on_login = on_login
-        self.root.title("Login - Shelf-life Study System")
-        self.root.geometry("320x180")
-        self.root.resizable(False, False)
-
-        # Create and place username label and entry
-        tk.Label(root, text="Username:").grid(row=0, column=0, padx=10, pady=10, sticky="e")
-        self.username_entry = tk.Entry(root)
-        self.username_entry.grid(row=0, column=1, padx=10, pady=10)
-
-        # Create and place password label and entry
-        tk.Label(root, text="Password:").grid(row=1, column=0, padx=10, pady=10, sticky="e")
-        self.password_entry = tk.Entry(root, show="*")
-        self.password_entry.grid(row=1, column=1, padx=10, pady=10)
-
-        # Create and place login button
-        tk.Button(root, text="Login", width=10, command=self.login).grid(row=2, column=1, pady=10, sticky="e")
-
-        # Label to show login status (e.g., error messages)
-        self.status_label = tk.Label(root, text="", fg="red")
-        self.status_label.grid(row=3, column=0, columnspan=2)
-
-        def login(self):
-        username = self.username_entry.get().strip()
-        password = self.password_entry.get().strip()
-
-        # Check if username or password is empty
-        if not username and not password:
-            self.status_label.config(text="Please enter username and password.")
-            return
-        elif username and not password:
-            self.status_label.config(text="Please enter your password.")
-            return
-        elif not username and password:
-            self.status_label.config(text="Please enter your username.")
-            return
-
-        user = USERS.get(username)
-
-        if user:
-            if user["password"] == password:
-                self.on_login(username, user["role"])
-            else:
-                self.status_label.config(text="Incorrect password. Please try again.")
-        else:
-            self.status_label.config(text="Invalid username or password.")
 
 # --- Main Application ---
 class ShelfLifeApp:
@@ -78,10 +40,340 @@ class ShelfLifeApp:
         self.data = pd.DataFrame()
         self.file_path = ""
 
-        # Setup UI
-        self.setup_ui()
+        self.current_user = None
+        self.login_screen()
 
-    def setup_ui(self):
+    # -------- LOGIN SCREEN --------
+    def login_screen(self):
+        self.clear_root()
+        frame = ttk.Frame(self.root, padding=20)
+        frame.pack()
+
+        ttk.Label(frame, text="Username:").grid(row=0, column=0, sticky="e")
+        self.username_entry = ttk.Entry(frame, width=30)
+        self.username_entry.grid(row=0, column=1)
+
+        ttk.Label(frame, text="Password:").grid(row=1, column=0, sticky="e")
+        self.password_entry = ttk.Entry(frame, width=30, show="*")
+        self.password_entry.grid(row=1, column=1)
+
+        ttk.Button(frame, text="Login", command=self.handle_login).grid(row=2, column=0, columnspan=2, pady=10)
+        # Add Sign Up button
+        ttk.Button(frame, text="Sign Up", command=self.signup_screen).grid(row=3, column=0, columnspan=2)
+
+    def handle_login(self):
+        username = self.username_entry.get().strip()
+        password = self.password_entry.get().strip()
+
+        if not username:
+            messagebox.showerror("Error", "Username is required")
+            return
+        if not validate_password(password):
+            messagebox.showerror("Error", f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+            return
+
+        # Query Firestore users collection
+        users_ref = db.collection("users")
+        query = users_ref.where("username", "==", username).where("password", "==", password).limit(1).get()
+
+        if not query:
+            messagebox.showerror("Error", "Invalid username or password")
+            return
+
+        user_doc = query[0]
+        user_data = user_doc.to_dict()
+        self.current_user = user_data
+        self.current_user['id'] = user_doc.id
+
+        # Redirect based on role
+        if user_data.get("role") == "admin":
+            self.admin_dashboard()
+        else:
+            self.user_dashboard()
+
+    # -------- SIGN UP SCREEN --------
+    def signup_screen(self):
+        self.clear_root()
+        frame = ttk.Frame(self.root, padding=20)
+        frame.pack()
+
+        ttk.Label(frame, text="Username:").grid(row=0, column=0, sticky="e")
+        self.signup_username_entry = ttk.Entry(frame, width=30)
+        self.signup_username_entry.grid(row=0, column=1)
+
+        ttk.Label(frame, text="Email:").grid(row=1, column=0, sticky="e")
+        self.signup_email_entry = ttk.Entry(frame, width=30)
+        self.signup_email_entry.grid(row=1, column=1)
+
+        ttk.Label(frame, text="Password:").grid(row=2, column=0, sticky="e")
+        self.signup_password_entry = ttk.Entry(frame, width=30, show="*")
+        self.signup_password_entry.grid(row=2, column=1)
+
+        ttk.Label(frame, text="Confirm Password:").grid(row=3, column=0, sticky="e")
+        self.signup_confirm_password_entry = ttk.Entry(frame, width=30, show="*")
+        self.signup_confirm_password_entry.grid(row=3, column=1)
+
+        ttk.Label(frame, text="Role:").grid(row=4, column=0, sticky="e")
+        self.signup_role = ttk.Combobox(frame, values=["user", "admin"], state="readonly", width=27)
+        self.signup_role.grid(row=4, column=1)
+        self.signup_role.current(0)
+
+        ttk.Button(frame, text="Sign Up", command=self.handle_signup).grid(row=5, column=0, columnspan=2, pady=10)
+        ttk.Button(frame, text="Back to Login", command=self.login_screen).grid(row=6, column=0, columnspan=2)
+
+    def handle_signup(self):
+        username = self.signup_username_entry.get().strip()
+        email = self.signup_email_entry.get().strip()
+        password = self.signup_password_entry.get().strip()
+        confirm_password = self.signup_confirm_password_entry.get().strip()
+        role = self.signup_role.get().strip()
+
+        if not username:
+            messagebox.showerror("Error", "Username is required")
+            return
+        if not validate_email(email):
+            messagebox.showerror("Error", "Invalid email format")
+            return
+        if not validate_password(password):
+            messagebox.showerror("Error", f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+            return
+        if password != confirm_password:
+            messagebox.showerror("Error", "Passwords do not match")
+            return
+        if role not in ["user", "admin"]:
+            messagebox.showerror("Error", "Please select a valid role")
+            return
+
+        users_ref = db.collection("users")
+
+        # Check if username exists
+        existing_user = users_ref.where("username", "==", username).limit(1).get()
+        if existing_user:
+            messagebox.showerror("Error", "Username already exists")
+            return
+
+        # Check if email exists
+        existing_email = users_ref.where("email", "==", email).limit(1).get()
+        if existing_email:
+            messagebox.showerror("Error", "Email already registered")
+            return
+
+        # Add new account
+        user_data = {
+            "username": username,
+            "email": email,
+            "password": password,
+            "role": role
+        }
+        try:
+            users_ref.add(user_data)
+            messagebox.showinfo("Success", "Registration successful! You can now log in.")
+            self.login_screen()
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to register user: {e}")
+
+    # -------- ADMIN DASHBOARD --------
+    def admin_dashboard(self):
+        self.clear_root()
+        self.root.geometry("1000x600")
+
+        # LOGOUT BUTTON (Top-left)
+        logout_frame = ttk.Frame(self.root)
+        logout_frame.pack(anchor="nw", padx=10, pady=10)
+        ttk.Button(logout_frame, text="Logout", command=self.logout).pack()
+
+        ttk.Label(self.root, text="Welcome to the Admin Dashboard!", font=("Helvetica", 16)).pack(pady=20)
+
+        # You can now manually place the user management and batch approval sections
+        # directly on the root, or in separate frames instead of tabs.
+
+        # USERS SECTION
+        self.users_tree = ttk.Treeview(self.root, columns=("Email", "Name", "Role"), show='headings')
+        for col in ("Email", "Name", "Role"):
+            self.users_tree.heading(col, text=col)
+        self.users_tree.pack(expand=True, fill="both", padx=10, pady=10)
+
+        btn_frame = ttk.Frame(self.root)
+        btn_frame.pack(pady=5)
+
+        ttk.Button(btn_frame, text="Add User", command=self.admin_add_user).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Edit User", command=self.admin_edit_user).pack(side="left", padx=5)
+        ttk.Button(btn_frame, text="Delete User", command=self.admin_delete_user).pack(side="left", padx=5)
+
+        self.load_users()
+
+        # BATCHES SECTION
+        self.batches_tree = ttk.Treeview(self.root,
+                                         columns=("ProductID", "Name", "Description", "TestDate", "User", "Status"),
+                                         show='headings')
+        for col in ("ProductID", "Name", "Description", "TestDate", "User", "Status"):
+            self.batches_tree.heading(col, text=col)
+        self.batches_tree.pack(expand=True, fill="both", padx=10, pady=10)
+
+        btn_batch_frame = ttk.Frame(self.root)
+        btn_batch_frame.pack(pady=5)
+
+        ttk.Button(btn_batch_frame, text="Approve Batch", command=self.admin_approve_batch).pack(side="left", padx=5)
+        ttk.Button(btn_batch_frame, text="Export Approved Batches", command=self.export_user_batches).pack(side="left",
+                                                                                                           padx=5)
+
+        self.load_batches()
+
+        # LOGOUT BUTTON
+        logout_frame = ttk.Frame(self.root)
+        logout_frame.pack(pady=10)
+        ttk.Button(logout_frame, text="Logout", command=self.logout).pack()
+
+    def load_users(self):
+        self.users_tree.delete(*self.users_tree.get_children())
+        users = db.collection("users").stream()
+        for user in users:
+            data = user.to_dict()
+            self.users_tree.insert("", "end", iid=user.id, values=(data.get("email"), data.get("name", ""), data.get("role")))
+
+    def admin_add_user(self):
+        self.user_form_window()
+
+    def admin_edit_user(self):
+        selected = self.users_tree.selection()
+        if not selected:
+            messagebox.showinfo("Info", "Please select a user to edit.")
+            return
+        user_id = selected[0]
+        user_doc = db.collection("users").document(user_id).get()
+        if user_doc.exists:
+            user_data = user_doc.to_dict()
+            self.user_form_window(user_id=user_id, user_data=user_data)
+
+    def admin_delete_user(self):
+        selected = self.users_tree.selection()
+        if not selected:
+            messagebox.showinfo("Info", "Please select a user to delete.")
+            return
+        user_id = selected[0]
+        confirm = messagebox.askyesno("Confirm Delete", "Are you sure you want to delete this user?")
+        if confirm:
+            db.collection("users").document(user_id).delete()
+            self.load_users()
+
+    def user_form_window(self, user_id=None, user_data=None):
+        form = tk.Toplevel(self.root)
+        form.title("User Form")
+        form.geometry("350x300")
+
+        ttk.Label(form, text="Email:").pack(pady=5)
+        email_entry = ttk.Entry(form)
+        email_entry.pack()
+        if user_data:
+            email_entry.insert(0, user_data.get("email"))
+            if user_id:
+                email_entry.config(state='disabled')
+
+        ttk.Label(form, text="Name:").pack(pady=5)
+        name_entry = ttk.Entry(form)
+        name_entry.pack()
+        if user_data:
+            name_entry.insert(0, user_data.get("name", ""))
+
+        ttk.Label(form, text="Password:").pack(pady=5)
+        password_entry = ttk.Entry(form, show="*")
+        password_entry.pack()
+        if user_data:
+            password_entry.insert(0, user_data.get("password"))
+
+        ttk.Label(form, text="Role (admin/user):").pack(pady=5)
+        role_entry = ttk.Entry(form)
+        role_entry.pack()
+        if user_data:
+            role_entry.insert(0, user_data.get("role", "user"))
+
+        def submit():
+            email = email_entry.get().strip()
+            name = name_entry.get().strip()
+            password = password_entry.get().strip()
+            role = role_entry.get().strip().lower()
+
+            if not validate_email(email):
+                messagebox.showerror("Error", "Invalid email format")
+                return
+            if not validate_password(password):
+                messagebox.showerror("Error", f"Password must be at least {MIN_PASSWORD_LENGTH} characters")
+                return
+            if role not in ["admin", "user"]:
+                messagebox.showerror("Error", "Role must be 'admin' or 'user'")
+                return
+
+            # Check duplicate emails for new user
+            if not user_id:
+                existing_users = db.collection("users").where("email", "==", email).get()
+                if existing_users:
+                    messagebox.showerror("Error", "Email already exists")
+                    return
+
+            user_obj = {"email": email, "name": name, "password": password, "role": role}
+
+            try:
+                if user_id:
+                    db.collection("users").document(user_id).set(user_obj)
+                else:
+                    db.collection("users").add(user_obj)
+                self.load_users()
+                form.destroy()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to save user: {e}")
+
+        ttk.Button(form, text="Submit", command=submit).pack(pady=10)
+
+    def load_batches(self):
+        self.batches_tree.delete(*self.batches_tree.get_children())
+        batches = db.collection("batches").stream()
+        for batch in batches:
+            data = batch.to_dict()
+            test_date_str = data.get("test_date", "")
+            if isinstance(test_date_str, datetime):
+                test_date_str = test_date_str.strftime("%Y-%m-%d")
+            self.batches_tree.insert("", "end", iid=batch.id,
+                                     values=(data.get("product_id", ""),
+                                             data.get("product_name", ""),
+                                             data.get("description", ""),
+                                             test_date_str,
+                                             data.get("user_email", ""),
+                                             data.get("status", "pending")))
+
+    def admin_approve_batch(self):
+        selected = self.batches_tree.selection()
+        if not selected:
+            messagebox.showinfo("Info", "Please select a batch to approve.")
+            return
+        batch_id = selected[0]
+        batch_ref = db.collection("batches").document(batch_id)
+        batch_doc = batch_ref.get()
+        if batch_doc.exists:
+            batch_data = batch_doc.to_dict()
+            if batch_data.get("status") == "approved":
+                messagebox.showinfo("Info", "Batch already approved.")
+                return
+
+            confirm = messagebox.askyesno("Confirm Approve", "Approve this batch?")
+            if confirm:
+                batch_ref.update({"status": "approved"})
+                self.load_batches()
+
+    def logout(self):
+        confirm = messagebox.askyesno("Logout", "Are you sure you want to logout?")
+        if confirm:
+            self.current_user = None
+            self.login_screen()
+
+    # -------- USER DASHBOARD --------
+    def user_dashboard(self):
+
+        self.clear_root()
+        self.root.geometry("1000x600")
+        self.excel_imported = False
+
+        ttk.Label(self.root, text="Welcome to the User Dashboard!", font=("Helvetica", 16)).pack(pady=20)
+
         # === Menu Bar ===
         menubar = tk.Menu(self.root)
 
@@ -359,21 +651,20 @@ class ShelfLifeApp:
         tk.Button(form, text="Save", command=submit).pack(pady=10)
 
     def logout(self):
-        if messagebox.askyesno("Confirm Logout", "Are you sure you want to log out?"):
-            self.root.destroy()
-            main()  # re-open the login screen
+        confirm = messagebox.askyesno("Logout", "Are you sure you want to logout?")
+        if confirm:
+            self.current_user = None
+            self.login_screen()
 
 
-def main():
-    login_root = tk.Tk()
-    def on_login(username, role):
-        login_root.destroy()
-        app_root = tk.Tk()
-        app = ShelfLifeApp(app_root)
-        app_root.mainloop()
+    # -------- UTIL --------
+    def clear_root(self):
+        for widget in self.root.winfo_children():
+            widget.destroy()
 
-    login_screen = LoginScreen(login_root, on_login)
-    login_root.mainloop()
+    # -------- TESTER DASHBOARD ---------
 
 if __name__ == "__main__":
-    main()
+    root = tk.Tk()
+    app = ShelfLifeApp(root)
+    root.mainloop()
