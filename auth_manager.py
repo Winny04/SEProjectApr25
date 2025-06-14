@@ -21,8 +21,8 @@ class AuthManager:
     def login_screen(self):
         """Displays the login screen for users."""
         self.app.clear_root()
-        frame = ttk.Frame(self.root, padding=40) 
-        frame.pack(expand=True) 
+        frame = ttk.Frame(self.root, padding=40)
+        frame.pack(expand=True)
 
         frame.columnconfigure(0, weight=1)
         frame.columnconfigure(1, weight=1)
@@ -60,8 +60,18 @@ class AuthManager:
         user_doc = query[0]
         user_data = user_doc.to_dict()
         self.app.current_user = user_data
-        self.app.current_user['id'] = user_doc.id 
-        self.app.current_user['employee_id'] = user_doc.id 
+        self.app.current_user['id'] = user_doc.id
+        self.app.current_user['employee_id'] = user_doc.id
+
+        # New: Check user status
+        if user_data.get("role") != "admin" and user_data.get("status") == "pending":
+            messagebox.showerror("Login Error",
+                                 "Your account is pending admin approval. Please contact an administrator.")
+            self.app.current_user = None  # Clear current user
+            return
+
+        # If not pending (or if admin), proceed with login
+        self.app.current_user = user_data
 
         if user_data.get("role") == "admin":
             self.app.admin_dashboard()
@@ -97,7 +107,7 @@ class AuthManager:
         ttk.Label(frame, text="Role:").grid(row=5, column=0, sticky="e", pady=5, padx=5)
         self.signup_role = ttk.Combobox(frame, values=["user", "admin"], state="readonly", width=27)
         self.signup_role.grid(row=5, column=1, sticky="ew", pady=5, padx=5)
-        self.signup_role.current(0) 
+        self.signup_role.current(0)
 
         ttk.Button(frame, text="Sign Up", command=self.handle_signup, style="Accent.TButton").grid(row=6, column=0, columnspan=2, pady=15)
         ttk.Button(frame, text="Back to Login", command=self.login_screen).grid(row=7, column=0, columnspan=2)
@@ -144,26 +154,27 @@ class AuthManager:
         existing_username_query = users_ref.where("username", "==", username).limit(1).get()
         if existing_username_query:
             for doc in existing_username_query:
-                if doc.id != employee_id: 
+                if doc.id != employee_id:
                     messagebox.showerror("Error", "Username already exists.")
                     return
 
         existing_email_query = users_ref.where("email", "==", email).limit(1).get()
         if existing_email_query:
             for doc in existing_email_query:
-                if doc.id != employee_id: 
+                if doc.id != employee_id:
                     messagebox.showerror("Error", "Email already registered.")
                     return
 
         user_data = {
-            "employee_id": employee_id, 
+            "employee_id": employee_id,
             "username": username,
             "email": email,
-            "password": password, 
-            "role": role
+            "password": password,
+            "role": role,
+            "status": "active" if role == "admin" else "pending"
         }
         try:
-            users_ref.document(employee_id).set(user_data) 
+            users_ref.document(employee_id).set(user_data)
             messagebox.showinfo("Success", "Registration successful! You can now log in.")
             self.app.login_screen()
         except Exception as e:
@@ -173,9 +184,9 @@ class AuthManager:
         """Creates a Toplevel window for adding or editing user details (for admin)."""
         form = tk.Toplevel(self.root)
         form.title("User Form")
-        form.geometry("400x400") 
-        form.grab_set() 
-        form.transient(self.root) 
+        form.geometry("400x400")
+        form.grab_set()
+        form.transient(self.root)
 
         frame = ttk.Frame(form, padding=15)
         frame.pack(expand=True, fill="both")
@@ -183,10 +194,10 @@ class AuthManager:
         ttk.Label(frame, text="Employee ID (E...):").grid(row=0, column=0, sticky="e", pady=5)
         employee_id_entry = ttk.Entry(frame, width=30)
         employee_id_entry.grid(row=0, column=1, sticky="ew", pady=5)
-        if user_data: 
+        if user_data:
             employee_id_entry.insert(0, user_data.get("employee_id", ""))
             employee_id_entry.config(state='disabled')
-        
+
         ttk.Label(frame, text="Username:").grid(row=1, column=0, sticky="e", pady=5)
         username_entry = ttk.Entry(frame, width=30)
         username_entry.grid(row=1, column=1, sticky="ew", pady=5)
@@ -203,7 +214,7 @@ class AuthManager:
         password_entry = ttk.Entry(frame, width=30, show="*")
         password_entry.grid(row=3, column=1, sticky="ew", pady=5)
         if user_data:
-            password_entry.insert(0, user_data.get("password", "")) 
+            password_entry.insert(0, user_data.get("password", ""))
 
         ttk.Label(frame, text="Role (admin/user):").grid(row=4, column=0, sticky="e", pady=5)
         role_combobox = ttk.Combobox(frame, values=["user", "admin"], state="readonly", width=27)
@@ -213,21 +224,38 @@ class AuthManager:
         else:
             role_combobox.current(0)
 
+            # New: Status field
+            ttk.Label(frame, text="Status:").grid(row=5, column=0, sticky="e", pady=5)
+            status_combobox = ttk.Combobox(frame, values=["pending", "active"], state="readonly", width=27)
+            status_combobox.grid(row=5, column=1, sticky="ew", pady=5)
+            if user_data:
+                status_combobox.set(user_data.get("status", "pending"))
+            else:
+                status_combobox.current(0)  # Default to pending for new users
+            # End New
+
         def submit():
-            current_employee_id = employee_id_entry.get().strip() 
+            current_employee_id = employee_id_entry.get().strip()
             username = username_entry.get().strip()
             email = email_entry.get().strip()
             password = password_entry.get().strip()
             role = role_combobox.get().strip().lower()
+            status = status_combobox.get().strip().lower()  # New: Retrieve status
 
             # --- Validation ---
-            if not user_id: 
+            if not user_id:
                 if not current_employee_id:
                     messagebox.showerror("Error", "Employee ID is required.")
                     return
                 if not validate_employee_id(current_employee_id):
                     messagebox.showerror("Error", "Invalid Employee ID format. Must start with 'E' followed by digits (e.g., E12345).")
                     return
+
+            # New: Validate status
+            if status not in ["pending", "active"]:
+                messagebox.showerror("Error", "Status must be 'pending' or 'active'.")
+                return
+            # End New
 
             if not username:
                 messagebox.showerror("Error", "Username is required.")
@@ -244,7 +272,7 @@ class AuthManager:
 
             users_ref = db.collection("users")
 
-            if not user_id: 
+            if not user_id:
                 if users_ref.document(current_employee_id).get().exists:
                     messagebox.showerror("Error", "Employee ID already exists.")
                     return
@@ -256,7 +284,7 @@ class AuthManager:
                 if existing_email_query:
                     messagebox.showerror("Error", "Email already exists.")
                     return
-            else: 
+            else:
                 existing_username_query = users_ref.where("username", "==", username).limit(1).get()
                 for doc in existing_username_query:
                     if doc.id != user_id:
@@ -269,26 +297,27 @@ class AuthManager:
                         return
 
             user_obj = {
-                "employee_id": current_employee_id if not user_id else user_id, 
+                "employee_id": current_employee_id if not user_id else user_id,
                 "username": username,
                 "email": email,
-                "password": password, 
-                "role": role
+                "password": password,
+                "role": role,
+                "status": "active" if role == "admin" else "pending"# New: Include status in user_obj
             }
 
             try:
-                if user_id: 
+                if user_id:
                     db.collection("users").document(user_id).set(user_obj)
                     messagebox.showinfo("Success", "User updated successfully.")
-                else: 
+                else:
                     db.collection("users").document(current_employee_id).set(user_obj)
                     messagebox.showinfo("Success", "User added successfully.")
-                
+
                 # This needs to call back to AdminLogic to refresh users_tree
-                self.app.admin_logic.load_users() 
+                self.app.admin_logic.load_users()
                 form.destroy()
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to save user: {e}")
 
-        ttk.Button(frame, text="Submit", command=submit, style="Accent.TButton").grid(row=5, column=0, columnspan=2, pady=15) 
-        form.protocol("WM_DELETE_WINDOW", form.destroy) 
+        ttk.Button(frame, text="Submit", command=submit, style="Accent.TButton").grid(row=6, column=0, columnspan=2, pady=15)
+        form.protocol("WM_DELETE_WINDOW", form.destroy)
