@@ -1,34 +1,9 @@
-# firebase link（database）： https://console.firebase.google.com/u/0/project/seprojectapr25/firestore/databases/-default-/data
-have two document(users for signup and login) & (add new batches)
+ALL the files are needed in order to run GUI.
+Exclude the SE_project.py
 
+Needed for running:
 
-# Login page
-additional:
-forget pass
+pip install firebase-admin pandas python-barcode
+Service account file from firebase. *(each person has their own private key)*
 
-# DONE Admin
-Button/Function: Add new user, delete user, edit user, Approve & Reject sample
-
-
-# DONE User(Product Owner)
-Button/Function:
-Add new batch: product id:, product name:, product description:, test date:
--> Admin will approved: Save to excel file(based on date), Generate bar code
-# NOT YET DONE
--> Edit batch
-*Reminder email send to everyone
-additinal: 
-test date select calendar date, no enter the date
-tab menu flow admin
-do not auto export aprroved excel file
-
-
-# Tester
-# NOT YET DONE
-Test Start:
-Test End:
-expire soon -> Send reminder email - Product owner and Test Team
-
-
-
-
+RUN MAIN_APP.py
