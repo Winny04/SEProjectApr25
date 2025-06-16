@@ -3,9 +3,12 @@ import tkinter as tk
 from tkinter import ttk, messagebox
 
 # Import modules
+from firebase_setup import db
 from auth_manager import AuthManager
 from user_logic import UserLogic
 from admin_logic import AdminLogic
+from tester_logic import TesterLogic
+from constants import MIN_PASSWORD_LENGTH # Just for style mapping, not direct use in logic here
 
 class ShelfLifeApp:
     def __init__(self, root):
@@ -22,6 +25,7 @@ class ShelfLifeApp:
         self.auth_manager = AuthManager(self.root, self)
         self.user_logic = UserLogic(self.root, self)
         self.admin_logic = AdminLogic(self.root, self)
+        self.tester_logic = TesterLogic(self.root, self)
 
         self.login_screen()
 
@@ -41,6 +45,9 @@ class ShelfLifeApp:
     def user_dashboard(self):
         """Displays the user dashboard by delegating to UserLogic."""
         self.user_logic.user_dashboard()
+
+    def test_dashboard(self):
+        self.tester_logic.tester_dashboard()
         
     def logout(self):
         """Logs out the current user and returns to the login screen."""
