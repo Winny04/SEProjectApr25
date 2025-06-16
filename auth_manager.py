@@ -75,8 +75,14 @@ class AuthManager:
 
         if user_data.get("role") == "admin":
             self.app.admin_dashboard()
-        else:
+        elif user_data.get("role") == "user":  # Assuming "user" is the role for general users
             self.app.user_dashboard()
+        elif user_data.get("role") == "tester":  # Correctly routing for tester role
+            self.app.test_dashboard()
+        else:
+            # Handle unknown or unapproved roles
+            messagebox.showwarning("Access Denied", "Your role is not recognized or approved for access.")
+            self.app.logout()
 
     def signup_screen(self):
         """Displays the sign-up screen for new users."""
@@ -105,7 +111,7 @@ class AuthManager:
         self.signup_confirm_password_entry.grid(row=4, column=1, sticky="ew", pady=5, padx=5)
 
         ttk.Label(frame, text="Role:").grid(row=5, column=0, sticky="e", pady=5, padx=5)
-        self.signup_role = ttk.Combobox(frame, values=["user", "admin"], state="readonly", width=27)
+        self.signup_role = ttk.Combobox(frame, values=["user", "admin", "tester"], state="readonly", width=27)
         self.signup_role.grid(row=5, column=1, sticky="ew", pady=5, padx=5)
         self.signup_role.current(0)
 
@@ -140,7 +146,7 @@ class AuthManager:
         if password != confirm_password:
             messagebox.showerror("Error", "Passwords do not match.")
             return
-        if role not in ["user", "admin"]:
+        if role not in ["user", "admin", "tester"]:
             messagebox.showerror("Error", "Please select a valid role.")
             return
 
@@ -217,7 +223,7 @@ class AuthManager:
             password_entry.insert(0, user_data.get("password", ""))
 
         ttk.Label(frame, text="Role (admin/user):").grid(row=4, column=0, sticky="e", pady=5)
-        role_combobox = ttk.Combobox(frame, values=["user", "admin"], state="readonly", width=27)
+        role_combobox = ttk.Combobox(frame, values=["user", "admin", "tester"], state="readonly", width=27)
         role_combobox.grid(row=4, column=1, sticky="ew", pady=5)
         if user_data:
             role_combobox.set(user_data.get("role", "user"))
@@ -266,8 +272,8 @@ class AuthManager:
             if not validate_password(password):
                 messagebox.showerror("Error", f"Password must be at least {MIN_PASSWORD_LENGTH} characters.")
                 return
-            if role not in ["admin", "user"]:
-                messagebox.showerror("Error", "Role must be 'admin' or 'user'.")
+            if role not in ["admin", "user", "tester"]:
+                messagebox.showerror("Error", "Role must be 'admin', 'user' or 'tester'.")
                 return
 
             users_ref = db.collection("users")
@@ -321,3 +327,4 @@ class AuthManager:
 
         ttk.Button(frame, text="Submit", command=submit, style="Accent.TButton").grid(row=6, column=0, columnspan=2, pady=15)
         form.protocol("WM_DELETE_WINDOW", form.destroy)
+

@@ -1,4 +1,4 @@
-# user_logic.py
+#user_logic.py
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import pandas as pd
@@ -7,22 +7,22 @@ import barcode
 from barcode.writer import ImageWriter
 import os
 from firebase_setup import db
-from constants import NOTIFICATION_DAYS_BEFORE, COLUMNS
+from constants import NOTIFICATION_DAYS_BEFORE
 
 class UserLogic:
     def __init__(self, root, app_instance):
         self.root = root
         self.app = app_instance
-        self.tree = None # Treeview widget
-        self.status_label = None # Status bar label
-        self.excel_imported = False # Flag to track if data was imported from local Excel
+        self.tree = None  # Treeview widget
+        self.status_label = None  # Status bar label
+        self.excel_imported = False  # Flag to track if data was imported from local Excel
 
         # Elements for the add_sample form
         self.batch_choice = None
         self.existing_batch_combobox = None
         self.new_batch_product_name = None
         self.new_batch_description = None
-        self.new_batch_test_date = None
+        self.new_batch_maturation_date = None
         self.entry_sample_id = None
         self.entry_owner = None
         self.entry_date = None
@@ -40,7 +40,7 @@ class UserLogic:
         filemenu.add_command(label="Import Excel (Local)", command=self.import_excel)
         filemenu.add_command(label="Export Excel (Local)", command=self.export_excel)
         filemenu.add_separator()
-        filemenu.add_command(label="Logout", command=self.app.logout) # Use app's logout
+        filemenu.add_command(label="Logout", command=self.app.logout)  # Use app's logout
         menubar.add_cascade(label="File", menu=filemenu)
         self.root.config(menu=menubar)
 
@@ -56,13 +56,14 @@ class UserLogic:
         ttk.Button(toolbar, text="Delete Sample", command=self.delete_sample).pack(side=tk.LEFT, padx=5)
 
         # === Treeview for Data Display ===
-        self.tree = ttk.Treeview(self.root, columns=("SampleID", "Owner", "MaturationDate", "Status", "BatchID"), show='headings')
+        self.tree = ttk.Treeview(self.root, columns=("SampleID", "Owner", "MaturationDate", "Status", "BatchID"),
+                                 show='headings')
         self.tree.heading("SampleID", text="Sample ID")
         self.tree.heading("Owner", text="Sample Owner")
         self.tree.heading("MaturationDate", text="Maturation Date")
         self.tree.heading("Status", text="Status")
         self.tree.heading("BatchID", text="Batch ID")
-        
+
         self.tree.column("SampleID", width=100, anchor="center")
         self.tree.column("Owner", width=100, anchor="center")
         self.tree.column("MaturationDate", width=120, anchor="center")
@@ -72,9 +73,10 @@ class UserLogic:
         self.tree.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
 
         # === Status Bar ===
-        self.status_label = tk.Label(self.root, text="Load samples from DB or import Excel.", anchor='w', bd=1, relief=tk.SUNKEN)
+        self.status_label = tk.Label(self.root, text="Load samples from DB or import Excel.", anchor='w', bd=1,
+                                     relief=tk.SUNKEN)
         self.status_label.pack(fill=tk.X, padx=10, pady=5)
-        
+
         # Load samples from DB on dashboard start for user
         self.load_samples_from_db()
 
@@ -87,27 +89,27 @@ class UserLogic:
             # Query for samples submitted by the current user
             # Use standard .where() method
             samples = samples_ref.where("submitted_by_employee_id", "==", self.app.current_user['employee_id']).stream()
-            
+
             for sample in samples:
                 data = sample.to_dict()
                 if isinstance(data.get('maturation_date'), datetime):
                     data['maturation_date'] = data['maturation_date']
-                else: # Convert Firestore Timestamp to datetime object for consistency
+                else:  # Convert Firestore Timestamp to datetime object for consistency
                     data['maturation_date'] = data['maturation_date'].to_datetime()
                 samples_list.append(data)
-            
+
             if samples_list:
                 self.app.data = pd.DataFrame(samples_list)
                 # Ensure all required columns are present in the DataFrame for display
                 for col in ["sample_id", "owner", "maturation_date", "status", "batch_id"]:
                     if col not in self.app.data.columns:
-                        self.app.data[col] = None 
-                # Rename columns for Treeview display
+                        self.app.data[col] = None
+                        # Rename columns for Treeview display
                 self.app.data.rename(columns={
-                    'sample_id': 'SampleID', 
-                    'owner': 'Owner', 
-                    'maturation_date': 'MaturationDate', 
-                    'status': 'Status', 
+                    'sample_id': 'SampleID',
+                    'owner': 'Owner',
+                    'maturation_date': 'MaturationDate',
+                    'status': 'Status',
                     'batch_id': 'BatchID'
                 }, inplace=True)
                 self.refresh_tree()
@@ -130,8 +132,8 @@ class UserLogic:
                 # Ensure required columns for display, including a placeholder for BatchID
                 if 'Status' not in self.app.data.columns:
                     self.app.data['Status'] = 'pending'
-                if 'BatchID' not in self.app.data.columns: 
-                    self.app.data['BatchID'] = 'N/A (Local)' 
+                if 'BatchID' not in self.app.data.columns:
+                    self.app.data['BatchID'] = 'N/A (Local)'
                 self.app.file_path = filename
                 self.refresh_tree()
                 self.status_label.config(text=f"Loaded data from {os.path.basename(filename)} (Local)")
@@ -150,8 +152,8 @@ class UserLogic:
             try:
                 df_to_export = self.app.data.copy()
                 if 'BatchID' in df_to_export.columns:
-                    df_to_export.rename(columns={'BatchID': 'batch_id'}, inplace=True) 
-                
+                    df_to_export.rename(columns={'BatchID': 'batch_id'}, inplace=True)
+
                 df_to_export.to_excel(filename, index=False)
                 self.status_label.config(text=f"Data exported to {os.path.basename(filename)}")
             except Exception as e:
@@ -165,8 +167,9 @@ class UserLogic:
             if isinstance(mat_date, pd.Timestamp) or isinstance(mat_date, datetime):
                 mat_date_str = mat_date.strftime("%Y-%m-%d")
             else:
-                mat_date_str = str(mat_date) 
-            self.tree.insert("", tk.END, values=(row['SampleID'], row['Owner'], mat_date_str, row['Status'], row.get('BatchID', 'N/A')))
+                mat_date_str = str(mat_date)
+            self.tree.insert("", tk.END, values=(
+                row['SampleID'], row['Owner'], mat_date_str, row['Status'], row.get('BatchID', 'N/A')))
 
     def generate_barcode(self):
         """Generates a barcode for the selected sample ID."""
@@ -175,10 +178,10 @@ class UserLogic:
             messagebox.showinfo("Info", "Please select a sample from the list.")
             return
         item = self.tree.item(selected[0])
-        sample_id = str(item['values'][0]) 
+        sample_id = str(item['values'][0])
 
         try:
-            EAN = barcode.get_barcode_class('code128') 
+            EAN = barcode.get_barcode_class('code128')
             ean = EAN(sample_id, writer=ImageWriter())
             save_path = filedialog.asksaveasfilename(defaultextension=".png",
                                                      filetypes=[("PNG files", "*.png")],
@@ -200,7 +203,7 @@ class UserLogic:
 
         for _, row in self.app.data.iterrows():
             mat_date = row['MaturationDate']
-            if pd.isna(mat_date): 
+            if pd.isna(mat_date):
                 continue
 
             if isinstance(mat_date, pd.Timestamp):
@@ -208,14 +211,15 @@ class UserLogic:
             elif isinstance(mat_date, datetime):
                 mat_date_dt = mat_date
             else:
-                try: 
+                try:
                     mat_date_dt = datetime.strptime(str(mat_date), "%Y-%m-%d")
                 except ValueError:
-                    continue 
+                    continue
 
             delta = mat_date_dt - today
             if 0 <= delta.days <= NOTIFICATION_DAYS_BEFORE:
-                notifications.append(f"Sample {row['SampleID']} owned by {row['Owner']} matures on {mat_date_dt.strftime('%Y-%m-%d')}.")
+                notifications.append(
+                    f"Sample {row['SampleID']} owned by {row['Owner']} matures on {mat_date_dt.strftime('%Y-%m-%d')}.")
 
         if notifications:
             messagebox.showinfo("Notifications", "\n".join(notifications))
@@ -226,7 +230,7 @@ class UserLogic:
         """Opens a form to add a new sample, with option to create new batch or select existing."""
         form = tk.Toplevel(self.root)
         form.title("Add New Sample")
-        form.geometry("500x550") 
+        form.geometry("500x550")
         form.grab_set()
         form.transient(self.root)
 
@@ -239,14 +243,17 @@ class UserLogic:
 
         self.batch_choice = tk.StringVar(value="existing")
         ttk.Radiobutton(batch_frame, text="Select Existing Batch", variable=self.batch_choice, value="existing",
-                        command=lambda: self.toggle_batch_fields(batch_frame, True)).grid(row=0, column=0, columnspan=2, sticky="w", pady=5)
+                        command=lambda: self.toggle_batch_fields(batch_frame, True)).grid(row=0, column=0, columnspan=2,
+                                                                                          sticky="w", pady=5)
         ttk.Radiobutton(batch_frame, text="Create New Batch", variable=self.batch_choice, value="new",
-                        command=lambda: self.toggle_batch_fields(batch_frame, False)).grid(row=1, column=0, columnspan=2, sticky="w", pady=5)
+                        command=lambda: self.toggle_batch_fields(batch_frame, False)).grid(row=1, column=0,
+                                                                                           columnspan=2, sticky="w",
+                                                                                           pady=5)
 
         ttk.Label(batch_frame, text="Existing Batch ID:").grid(row=2, column=0, sticky="e", pady=5, padx=5)
         self.existing_batch_combobox = ttk.Combobox(batch_frame, state="readonly", width=30)
         self.existing_batch_combobox.grid(row=2, column=1, sticky="ew", pady=5, padx=5)
-        self.load_existing_batches_into_combobox() 
+        self.load_existing_batches_into_combobox()
 
         ttk.Label(batch_frame, text="New Product Name:").grid(row=3, column=0, sticky="e", pady=5, padx=5)
         self.new_batch_product_name = ttk.Entry(batch_frame, width=30)
@@ -256,11 +263,12 @@ class UserLogic:
         self.new_batch_description = ttk.Entry(batch_frame, width=30)
         self.new_batch_description.grid(row=4, column=1, sticky="ew", pady=5, padx=5)
 
-        ttk.Label(batch_frame, text="New Batch Test Date (YYYY-MM-DD):").grid(row=5, column=0, sticky="e", pady=5, padx=5)
-        self.new_batch_test_date = ttk.Entry(batch_frame, width=30)
-        self.new_batch_test_date.grid(row=5, column=1, sticky="ew", pady=5, padx=5)
-        
-        self.toggle_batch_fields(batch_frame, True) 
+        ttk.Label(batch_frame, text="New Batch Maturation_date (YYYY-MM-DD):").grid(row=5, column=0, sticky="e", pady=5,
+                                                                                    padx=5)
+        self.new_batch_maturation_date = ttk.Entry(batch_frame, width=30)
+        self.new_batch_maturation_date.grid(row=5, column=1, sticky="ew", pady=5, padx=5)
+
+        self.toggle_batch_fields(batch_frame, True)
 
         # --- Sample Details Tab ---
         sample_frame = ttk.Frame(notebook, padding=10)
@@ -277,13 +285,15 @@ class UserLogic:
         ttk.Label(sample_frame, text="Maturation Date (YYYY-MM-DD):").grid(row=2, column=0, sticky="e", pady=5, padx=5)
         self.entry_date = ttk.Entry(sample_frame, width=30)
         self.entry_date.grid(row=2, column=1, sticky="ew", pady=5, padx=5)
-        
-        ttk.Label(sample_frame, text="Status:").grid(row=3, column=0, sticky="e", pady=5, padx=5)
-        self.status_combobox = ttk.Combobox(sample_frame, values=["pending", "approved", "rejected"], state="readonly", width=27)
-        self.status_combobox.grid(row=3, column=1, sticky="ew", pady=5, padx=5)
-        self.status_combobox.current(0) 
 
-        ttk.Button(form, text="Submit Sample", command=lambda: self.submit_new_sample(form)).pack(pady=10) # Pass form to close it
+        ttk.Label(sample_frame, text="Status:").grid(row=3, column=0, sticky="e", pady=5, padx=5)
+        self.status_combobox = ttk.Combobox(sample_frame, values=["pending", "approved", "rejected"], state="readonly",
+                                            width=27)
+        self.status_combobox.grid(row=3, column=1, sticky="ew", pady=5, padx=5)
+        self.status_combobox.current(0)
+
+        ttk.Button(form, text="Submit Sample", command=lambda: self.submit_new_sample(form)).pack(
+            pady=10)  # Pass form to close it
         form.protocol("WM_DELETE_WINDOW", form.destroy)
 
     def toggle_batch_fields(self, parent_frame, is_existing_batch_selected):
@@ -292,16 +302,16 @@ class UserLogic:
             self.existing_batch_combobox.config(state="readonly")
             self.new_batch_product_name.config(state="disabled")
             self.new_batch_description.config(state="disabled")
-            self.new_batch_test_date.config(state="disabled")
+            self.new_batch_maturation_date.config(state="disabled")
             self.new_batch_product_name.delete(0, tk.END)
             self.new_batch_description.delete(0, tk.END)
-            self.new_batch_test_date.delete(0, tk.END)
+            self.new_batch_maturation_date.delete(0, tk.END)
         else:
             self.existing_batch_combobox.config(state="disabled")
             self.new_batch_product_name.config(state="normal")
             self.new_batch_description.config(state="normal")
-            self.new_batch_test_date.config(state="normal")
-            self.existing_batch_combobox.set('') 
+            self.new_batch_maturation_date.config(state="normal")
+            self.existing_batch_combobox.set('')
 
     def load_existing_batches_into_combobox(self):
         """Loads batch IDs from Firestore into the combobox."""
@@ -342,22 +352,25 @@ class UserLogic:
 
         selected_batch_id = None
         new_batch_data = None
-        
+
+        # This status will be applied to the batch regardless of it being new or existing.
+        batch_status_after_sample_add = "pending"
+
         if self.batch_choice.get() == "new":
             product_name = self.new_batch_product_name.get().strip()
             description = self.new_batch_description.get().strip()
-            test_date_str = self.new_batch_test_date.get().strip()
+            maturation_date_str = self.new_batch_maturation_date.get().strip()
 
             if not product_name:
                 messagebox.showerror("Error", "New Batch Product Name is required.")
                 return
-            if not test_date_str:
-                messagebox.showerror("Error", "New Batch Test Date is required.")
+            if not maturation_date_str:
+                messagebox.showerror("Error", "New Batch Maturation Date is required.")
                 return
             try:
-                batch_test_date = datetime.strptime(test_date_str, "%Y-%m-%d")
+                batch_maturation_date = datetime.strptime(maturation_date_str, "%Y-%m-%d")
             except ValueError:
-                messagebox.showerror("Error", "Invalid New Batch Test Date format. UseYYYY-MM-DD.")
+                messagebox.showerror("Error", "Invalid New Batch Maturation Date format. UseYYYY-MM-DD.")
                 return
 
             selected_batch_id = f"batch_{self.app.current_user['employee_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
@@ -365,15 +378,15 @@ class UserLogic:
                 "batch_id": selected_batch_id,
                 "product_name": product_name,
                 "description": description,
-                "test_date": batch_test_date,
+                "maturation_date": batch_maturation_date,
                 "user_employee_id": self.app.current_user['employee_id'],
                 "user_username": self.app.current_user['username'],
                 "user_email": self.app.current_user['email'],
-                "submission_date": datetime.now(), # Use current datetime for submission
-                "status": "pending", 
-                "number_of_samples": 0 
+                "submission_date": datetime.now(),  # Use current datetime for submission
+                "status": batch_status_after_sample_add,  # Set new batch to pending
+                "number_of_samples": 0
             }
-        else: 
+        else:
             selected_batch_id = self.existing_batch_combobox.get().strip()
             if not selected_batch_id:
                 messagebox.showerror("Error", "Please select an existing batch.")
@@ -388,7 +401,7 @@ class UserLogic:
             "owner": owner,
             "maturation_date": mat_date,
             "status": sample_status,
-            "batch_id": selected_batch_id, 
+            "batch_id": selected_batch_id,
             "submitted_by_employee_id": self.app.current_user['employee_id']
         }
 
@@ -397,24 +410,39 @@ class UserLogic:
 
             if new_batch_data:
                 batch_write.set(db.collection("batches").document(selected_batch_id), new_batch_data)
-            
+
             sample_doc_ref = db.collection("samples").document(sample_id)
             batch_write.set(sample_doc_ref, sample_data)
 
             batch_doc_ref = db.collection("batches").document(selected_batch_id)
             current_batch_doc = batch_doc_ref.get()
+
+            # Increment sample count and set batch status to 'pending'
             if current_batch_doc.exists:
                 current_sample_count = current_batch_doc.to_dict().get("number_of_samples", 0)
-                batch_write.update(batch_doc_ref, {"number_of_samples": current_sample_count + 1})
+                batch_write.update(batch_doc_ref, {
+                    "number_of_samples": current_sample_count + 1,
+                    "status": batch_status_after_sample_add  # Explicitly set/revert to pending
+                })
             else:
-                batch_write.set(batch_doc_ref, {"number_of_samples": 1}, merge=True) 
+                # If for some reason batch did not exist (e.g., deleted by admin right before this),
+                # create it with the initial sample count and pending status.
+                batch_write.set(batch_doc_ref, {
+                    "number_of_samples": 1,
+                    "status": batch_status_after_sample_add,
+                    "batch_id": selected_batch_id
+                    # Ensure batch_id is set if it's a new entry due to 'merge=True' not creating it
+                    # Consider adding other default batch fields if a merge creates a new doc here
+                }, merge=True)  # Use merge=True to ensure it creates if not exists without overwriting if it does
 
             batch_write.commit()
 
             messagebox.showinfo("Success", f"Sample '{sample_id}' added successfully to Batch '{selected_batch_id}'.")
-            
+
             self.load_samples_from_db()
-            self.app.admin_logic.load_batches() # Refresh admin batch list via app instance
+            # Ensure admin_logic is properly initialized before trying to load batches
+            if hasattr(self.app, 'admin_logic') and self.app.admin_logic is not None:
+                self.app.admin_logic.load_batches()  # Refresh admin batch list via app instance
 
             form_window.destroy()
 
@@ -430,33 +458,93 @@ class UserLogic:
 
         item = self.tree.item(selected[0])
         sample_id = item['values'][0]
-        batch_id = item['values'][4] 
+        batch_id = item['values'][4]
 
-        confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete sample '{sample_id}' from Batch '{batch_id}'?")
+        confirm = messagebox.askyesno("Confirm Delete",
+                                      f"Are you sure you want to delete sample '{sample_id}' from Batch '{batch_id}'?")
         if not confirm:
             return
 
         try:
             batch_write = db.batch()
 
+            # Correct way to add a delete operation to a batch
             sample_doc_ref = db.collection("samples").document(sample_id)
             batch_write.delete(sample_doc_ref)
 
             batch_doc_ref = db.collection("batches").document(batch_id)
-            current_batch_doc = batch_doc_ref.get()
+            current_batch_doc = batch_doc_ref.get()  # Get latest state for count
             if current_batch_doc.exists:
                 current_sample_count = current_batch_doc.to_dict().get("number_of_samples", 0)
                 if current_sample_count > 0:
                     batch_write.update(batch_doc_ref, {"number_of_samples": current_sample_count - 1})
-            
+
+                # --- Logic to update batch status based on its samples after deletion ---
+                # Fetch samples *after* the current batch operation (simulated here)
+                # To accurately reflect the new state, you would query the database *after* the commit,
+                # or infer the state based on the deleted sample.
+                # For simplicity and to fit batching, we re-query *before* commit but know
+                # the effect of the pending deletion. A safer approach for real-time consistency
+                # would be to re-query AFTER commit if batch status is critical.
+                # Given current Firestore Python SDK limits, re-querying before commit is common
+                # if you need the current state for batch logic.
+
+                # Simulate the effect of deletion for batch status evaluation
+                remaining_samples_count = current_sample_count - 1
+
+                if remaining_samples_count > 0:
+                    # Check if all *remaining* samples are approved
+                    # This requires fetching all samples *except* the one just deleted, which is complex in one query.
+                    # A simpler approach: if ANY sample is pending, the batch is pending.
+                    # So, if we delete an approved sample, and others are pending, it remains pending.
+                    # If we delete the LAST pending sample, it needs to check if all others were approved.
+
+                    # More robust check: Re-fetch all samples for the batch *after* the delete is considered.
+                    # This implies the deletion has effectively happened for the purpose of this check.
+                    # Note: This is an extra read, but ensures correctness.
+                    samples_after_deletion_check = db.collection("samples").where("batch_id", "==", batch_id).stream()
+
+                    all_remaining_samples_approved = True
+                    has_remaining_samples = False
+
+                    # Iterate through samples *that will remain* after this batch operation
+                    # This is tricky as 'stream()' gets current state, not future state from the batch.
+                    # Simplest way: if this deleted sample was the only reason batch was approved, then it goes pending.
+                    # Otherwise, re-check remaining.
+
+                    # Let's simplify and enforce that ANY modification (add/delete/edit) by user
+                    # puts the batch back into pending for admin re-review, unless admin approves it.
+                    # This makes sense from a workflow perspective.
+                    new_batch_status_after_delete = "pending"
+
+                    # If the batch count drops to zero, the batch could also be 'completed' or 'empty',
+                    # but 'pending' is a safe default for admin attention.
+                    if remaining_samples_count == 0:
+                        new_batch_status_after_delete = "pending"  # Or "empty" / "completed" based on system logic
+                    else:
+                        # Re-evaluate based on the *actual* remaining samples in the database
+                        # after this batch completes. This is the more reliable check.
+                        # For a precise check *before* commit, you'd need to fetch and filter in app,
+                        # which can be complex.
+                        # A simpler, workflow-driven approach: any user modification (add/delete/edit)
+                        # flags the batch as pending.
+                        # The admin's `approve_or_reject_sample` will do the full re-evaluation.
+                        new_batch_status_after_delete = "pending"
+                else:  # No samples remaining
+                    new_batch_status_after_delete = "pending"  # If the last sample is deleted, batch becomes pending
+
+                batch_write.update(batch_doc_ref, {"status": new_batch_status_after_delete})
+                # --- End of batch status update logic after deletion ---
+
             batch_write.commit()
 
             messagebox.showinfo("Success", f"Sample '{sample_id}' deleted successfully.")
-            self.load_samples_from_db() 
-            self.app.admin_logic.load_batches() 
+            self.load_samples_from_db()
+            # Ensure admin_logic is properly initialized before trying to load batches
+            if hasattr(self.app, 'admin_logic') and self.app.admin_logic is not None:
+                self.app.admin_logic.load_batches()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete sample: {e}")
-
 
     def edit_sample(self):
         """Opens a form to edit details of a selected sample from Firestore."""
@@ -467,12 +555,14 @@ class UserLogic:
 
         item = self.tree.item(selected[0])
         sample_id = item['values'][0]
+        # Get the batch_id of the sample being edited
+        batch_id = item['values'][4]  # Assuming batch_id is at index 4 in treeview values
 
         try:
             sample_doc = db.collection("samples").document(sample_id).get()
             if not sample_doc.exists:
                 messagebox.showerror("Error", "Selected sample not found in database.")
-                self.load_samples_from_db() 
+                self.load_samples_from_db()
                 return
             row = sample_doc.to_dict()
         except Exception as e:
@@ -481,14 +571,14 @@ class UserLogic:
 
         form = tk.Toplevel(self.root)
         form.title(f"Edit Sample {sample_id}")
-        form.geometry("300x250") 
+        form.geometry("300x250")
         form.grab_set()
         form.transient(self.root)
 
         tk.Label(form, text="Sample ID:").pack(pady=5)
         entry_sample_id = tk.Entry(form)
         entry_sample_id.insert(0, row.get('sample_id', ''))
-        entry_sample_id.config(state='disabled') 
+        entry_sample_id.config(state='disabled')
         entry_sample_id.pack()
 
         tk.Label(form, text="Sample Owner:").pack(pady=5)
@@ -501,21 +591,22 @@ class UserLogic:
         mat_date_val = row.get('maturation_date')
         if isinstance(mat_date_val, datetime):
             entry_date.insert(0, mat_date_val.strftime('%Y-%m-%d'))
-        elif isinstance(mat_date_val, pd.Timestamp): # In case it's a Pandas Timestamp
+        elif isinstance(mat_date_val, pd.Timestamp):  # In case it's a Pandas Timestamp
             entry_date.insert(0, mat_date_val.strftime('%Y-%m-%d'))
         else:
             entry_date.insert(0, str(mat_date_val if mat_date_val else ''))
         entry_date.pack()
 
         tk.Label(form, text="Status:").pack(pady=5)
-        status_combobox = ttk.Combobox(form, values=["pending", "approved", "rejected"], state="readonly", width=27)
+        status_combobox = ttk.Combobox(form, values=["pending", "approved", "rejected"], state="disabled", width=27)
         status_combobox.pack()
-        status_combobox.set(row.get('status', 'pending')) 
+        status_combobox.set(row.get('status', 'pending'))
 
         def submit_edit():
             owner = entry_owner.get().strip()
             date_str = entry_date.get().strip()
-            status = status_combobox.get().strip()
+            # Status is not editable by user in this form, retain its original value from 'row'
+            current_sample_status = row.get('status', 'pending')
 
             if not owner or not date_str:
                 messagebox.showerror("Error", "All fields are required.")
@@ -526,23 +617,51 @@ class UserLogic:
                 messagebox.showerror("Error", "Invalid date format. UseYYYY-MM-DD.")
                 return
 
-            confirm = messagebox.askyesno("Confirm Edit", f"Are you sure you want to save changes to sample '{sample_id}'?")
+            confirm = messagebox.askyesno("Confirm Edit",
+                                          f"Are you sure you want to save changes to sample '{sample_id}'?")
             if not confirm:
                 return
-            
+
             updated_data = {
                 'owner': owner,
                 'maturation_date': mat_date,
-                'status': status
+                'status': current_sample_status  # Use the original status, as user cannot change it here
             }
 
             try:
                 db.collection("samples").document(sample_id).update(updated_data)
                 messagebox.showinfo("Success", f"Sample '{sample_id}' updated successfully.")
-                self.load_samples_from_db() 
+
+                # --- Logic to update batch status based on its samples (if any sample is pending, batch is pending) ---
+                samples_in_batch = db.collection("samples").where("batch_id", "==", batch_id).stream()
+
+                all_samples_approved = True
+                has_samples = False
+
+                for sample in samples_in_batch:
+                    has_samples = True
+                    if sample.to_dict().get("status") != "approved":
+                        all_samples_approved = False
+                        break
+
+                new_batch_status = "pending"  # Default to pending
+                if has_samples and all_samples_approved:
+                    new_batch_status = "approved"
+                elif has_samples and not all_samples_approved:
+                    new_batch_status = "pending"
+                elif not has_samples:
+                    new_batch_status = "pending"  # A batch without samples might also be pending for review or cleanup
+
+                db.collection("batches").document(batch_id).update({"status": new_batch_status})
+                # --- End of batch status update logic ---
+
+                self.load_samples_from_db()
+                # Refresh admin batch list if admin_logic is available
+                if hasattr(self.app, 'admin_logic') and self.app.admin_logic is not None:
+                    self.app.admin_logic.load_batches()
                 form.destroy()
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to update sample: {e}")
+                messagebox.showerror("Error", f"Failed to update sample or batch status: {e}")
 
         tk.Button(form, text="Save Changes", command=submit_edit).pack(pady=10)
         form.protocol("WM_DELETE_WINDOW", form.destroy)

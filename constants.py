@@ -10,4 +10,5 @@ NOTIFICATION_DAYS_BEFORE = 60 # 2 months approx.
 # Expected columns for Excel data, 'Status' will be added if not present
 # Note: These columns are primarily for local Excel import/export and Treeview display.
 # Firestore documents will have their own fields.
-COLUMNS = ["SampleID", "Owner", "MaturationDate", "Status"] 
+# constants.py
+COLUMNS = ["SampleID", "Owner", "MaturationDate", "Status", "BatchID", "ProductName", "Description", "TestDate", "UserEmployeeID", "UserUsername", "UserEmail", "SubmissionDate", "NumberOfSamples"]
