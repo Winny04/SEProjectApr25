@@ -6,6 +6,7 @@ import os
 from firebase_setup import db
 import firebase_admin  # Needed for firestore.Timestamp, but direct Timestamp check is removed
 
+
 class AdminLogic:
     def __init__(self, root, app_instance):
         self.root = root
@@ -59,8 +60,9 @@ class AdminLogic:
         ttk.Label(self.root, text="Batch Approval", font=("Helvetica", 14, "bold")).pack(pady=(20, 5))
         self.batches_tree = ttk.Treeview(self.root,
                                          columns=(
-                                         "BatchID", "Product Name", "Description", "Maturation Date", "User", "Status",
-                                         "Sample Count"),
+                                             "BatchID", "Product Name", "Description", "Maturation Date", "User",
+                                             "Status",
+                                             "Sample Count"),
                                          show='headings')
         # Updated heading for the date column to 'Maturation Date'
         self.batches_tree.heading("Maturation Date", text="Maturation Date")
