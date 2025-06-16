@@ -1,4 +1,4 @@
-# user_logic.py
+#user_logic.py
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 import pandas as pd
@@ -169,7 +169,7 @@ class UserLogic:
             else:
                 mat_date_str = str(mat_date)
             self.tree.insert("", tk.END, values=(
-            row['SampleID'], row['Owner'], mat_date_str, row['Status'], row.get('BatchID', 'N/A')))
+                row['SampleID'], row['Owner'], mat_date_str, row['Status'], row.get('BatchID', 'N/A')))
 
     def generate_barcode(self):
         """Generates a barcode for the selected sample ID."""
@@ -264,7 +264,7 @@ class UserLogic:
         self.new_batch_description.grid(row=4, column=1, sticky="ew", pady=5, padx=5)
 
         ttk.Label(batch_frame, text="New Batch Maturation_date (YYYY-MM-DD):").grid(row=5, column=0, sticky="e", pady=5,
-                                                                              padx=5)
+                                                                                    padx=5)
         self.new_batch_maturation_date = ttk.Entry(batch_frame, width=30)
         self.new_batch_maturation_date.grid(row=5, column=1, sticky="ew", pady=5, padx=5)
 
@@ -353,6 +353,9 @@ class UserLogic:
         selected_batch_id = None
         new_batch_data = None
 
+        # This status will be applied to the batch regardless of it being new or existing.
+        batch_status_after_sample_add = "pending"
+
         if self.batch_choice.get() == "new":
             product_name = self.new_batch_product_name.get().strip()
             description = self.new_batch_description.get().strip()
@@ -380,7 +383,7 @@ class UserLogic:
                 "user_username": self.app.current_user['username'],
                 "user_email": self.app.current_user['email'],
                 "submission_date": datetime.now(),  # Use current datetime for submission
-                "status": "pending",
+                "status": batch_status_after_sample_add,  # Set new batch to pending
                 "number_of_samples": 0
             }
         else:
@@ -413,18 +416,33 @@ class UserLogic:
 
             batch_doc_ref = db.collection("batches").document(selected_batch_id)
             current_batch_doc = batch_doc_ref.get()
+
+            # Increment sample count and set batch status to 'pending'
             if current_batch_doc.exists:
                 current_sample_count = current_batch_doc.to_dict().get("number_of_samples", 0)
-                batch_write.update(batch_doc_ref, {"number_of_samples": current_sample_count + 1})
+                batch_write.update(batch_doc_ref, {
+                    "number_of_samples": current_sample_count + 1,
+                    "status": batch_status_after_sample_add  # Explicitly set/revert to pending
+                })
             else:
-                batch_write.set(batch_doc_ref, {"number_of_samples": 1}, merge=True)
+                # If for some reason batch did not exist (e.g., deleted by admin right before this),
+                # create it with the initial sample count and pending status.
+                batch_write.set(batch_doc_ref, {
+                    "number_of_samples": 1,
+                    "status": batch_status_after_sample_add,
+                    "batch_id": selected_batch_id
+                    # Ensure batch_id is set if it's a new entry due to 'merge=True' not creating it
+                    # Consider adding other default batch fields if a merge creates a new doc here
+                }, merge=True)  # Use merge=True to ensure it creates if not exists without overwriting if it does
 
             batch_write.commit()
 
             messagebox.showinfo("Success", f"Sample '{sample_id}' added successfully to Batch '{selected_batch_id}'.")
 
             self.load_samples_from_db()
-            self.app.admin_logic.load_batches()  # Refresh admin batch list via app instance
+            # Ensure admin_logic is properly initialized before trying to load batches
+            if hasattr(self.app, 'admin_logic') and self.app.admin_logic is not None:
+                self.app.admin_logic.load_batches()  # Refresh admin batch list via app instance
 
             form_window.destroy()
 
@@ -450,21 +468,81 @@ class UserLogic:
         try:
             batch_write = db.batch()
 
+            # Correct way to add a delete operation to a batch
             sample_doc_ref = db.collection("samples").document(sample_id)
             batch_write.delete(sample_doc_ref)
 
             batch_doc_ref = db.collection("batches").document(batch_id)
-            current_batch_doc = batch_doc_ref.get()
+            current_batch_doc = batch_doc_ref.get()  # Get latest state for count
             if current_batch_doc.exists:
                 current_sample_count = current_batch_doc.to_dict().get("number_of_samples", 0)
                 if current_sample_count > 0:
                     batch_write.update(batch_doc_ref, {"number_of_samples": current_sample_count - 1})
 
+                # --- Logic to update batch status based on its samples after deletion ---
+                # Fetch samples *after* the current batch operation (simulated here)
+                # To accurately reflect the new state, you would query the database *after* the commit,
+                # or infer the state based on the deleted sample.
+                # For simplicity and to fit batching, we re-query *before* commit but know
+                # the effect of the pending deletion. A safer approach for real-time consistency
+                # would be to re-query AFTER commit if batch status is critical.
+                # Given current Firestore Python SDK limits, re-querying before commit is common
+                # if you need the current state for batch logic.
+
+                # Simulate the effect of deletion for batch status evaluation
+                remaining_samples_count = current_sample_count - 1
+
+                if remaining_samples_count > 0:
+                    # Check if all *remaining* samples are approved
+                    # This requires fetching all samples *except* the one just deleted, which is complex in one query.
+                    # A simpler approach: if ANY sample is pending, the batch is pending.
+                    # So, if we delete an approved sample, and others are pending, it remains pending.
+                    # If we delete the LAST pending sample, it needs to check if all others were approved.
+
+                    # More robust check: Re-fetch all samples for the batch *after* the delete is considered.
+                    # This implies the deletion has effectively happened for the purpose of this check.
+                    # Note: This is an extra read, but ensures correctness.
+                    samples_after_deletion_check = db.collection("samples").where("batch_id", "==", batch_id).stream()
+
+                    all_remaining_samples_approved = True
+                    has_remaining_samples = False
+
+                    # Iterate through samples *that will remain* after this batch operation
+                    # This is tricky as 'stream()' gets current state, not future state from the batch.
+                    # Simplest way: if this deleted sample was the only reason batch was approved, then it goes pending.
+                    # Otherwise, re-check remaining.
+
+                    # Let's simplify and enforce that ANY modification (add/delete/edit) by user
+                    # puts the batch back into pending for admin re-review, unless admin approves it.
+                    # This makes sense from a workflow perspective.
+                    new_batch_status_after_delete = "pending"
+
+                    # If the batch count drops to zero, the batch could also be 'completed' or 'empty',
+                    # but 'pending' is a safe default for admin attention.
+                    if remaining_samples_count == 0:
+                        new_batch_status_after_delete = "pending"  # Or "empty" / "completed" based on system logic
+                    else:
+                        # Re-evaluate based on the *actual* remaining samples in the database
+                        # after this batch completes. This is the more reliable check.
+                        # For a precise check *before* commit, you'd need to fetch and filter in app,
+                        # which can be complex.
+                        # A simpler, workflow-driven approach: any user modification (add/delete/edit)
+                        # flags the batch as pending.
+                        # The admin's `approve_or_reject_sample` will do the full re-evaluation.
+                        new_batch_status_after_delete = "pending"
+                else:  # No samples remaining
+                    new_batch_status_after_delete = "pending"  # If the last sample is deleted, batch becomes pending
+
+                batch_write.update(batch_doc_ref, {"status": new_batch_status_after_delete})
+                # --- End of batch status update logic after deletion ---
+
             batch_write.commit()
 
             messagebox.showinfo("Success", f"Sample '{sample_id}' deleted successfully.")
             self.load_samples_from_db()
-            self.app.admin_logic.load_batches()
+            # Ensure admin_logic is properly initialized before trying to load batches
+            if hasattr(self.app, 'admin_logic') and self.app.admin_logic is not None:
+                self.app.admin_logic.load_batches()
         except Exception as e:
             messagebox.showerror("Error", f"Failed to delete sample: {e}")
 
@@ -477,6 +555,8 @@ class UserLogic:
 
         item = self.tree.item(selected[0])
         sample_id = item['values'][0]
+        # Get the batch_id of the sample being edited
+        batch_id = item['values'][4]  # Assuming batch_id is at index 4 in treeview values
 
         try:
             sample_doc = db.collection("samples").document(sample_id).get()
@@ -518,14 +598,15 @@ class UserLogic:
         entry_date.pack()
 
         tk.Label(form, text="Status:").pack(pady=5)
-        status_combobox = ttk.Combobox(form, values=["pending", "approved", "rejected"], state="readonly", width=27)
+        status_combobox = ttk.Combobox(form, values=["pending", "approved", "rejected"], state="disabled", width=27)
         status_combobox.pack()
         status_combobox.set(row.get('status', 'pending'))
 
         def submit_edit():
             owner = entry_owner.get().strip()
             date_str = entry_date.get().strip()
-            status = status_combobox.get().strip()
+            # Status is not editable by user in this form, retain its original value from 'row'
+            current_sample_status = row.get('status', 'pending')
 
             if not owner or not date_str:
                 messagebox.showerror("Error", "All fields are required.")
@@ -544,16 +625,43 @@ class UserLogic:
             updated_data = {
                 'owner': owner,
                 'maturation_date': mat_date,
-                'status': status
+                'status': current_sample_status  # Use the original status, as user cannot change it here
             }
 
             try:
                 db.collection("samples").document(sample_id).update(updated_data)
                 messagebox.showinfo("Success", f"Sample '{sample_id}' updated successfully.")
+
+                # --- Logic to update batch status based on its samples (if any sample is pending, batch is pending) ---
+                samples_in_batch = db.collection("samples").where("batch_id", "==", batch_id).stream()
+
+                all_samples_approved = True
+                has_samples = False
+
+                for sample in samples_in_batch:
+                    has_samples = True
+                    if sample.to_dict().get("status") != "approved":
+                        all_samples_approved = False
+                        break
+
+                new_batch_status = "pending"  # Default to pending
+                if has_samples and all_samples_approved:
+                    new_batch_status = "approved"
+                elif has_samples and not all_samples_approved:
+                    new_batch_status = "pending"
+                elif not has_samples:
+                    new_batch_status = "pending"  # A batch without samples might also be pending for review or cleanup
+
+                db.collection("batches").document(batch_id).update({"status": new_batch_status})
+                # --- End of batch status update logic ---
+
                 self.load_samples_from_db()
+                # Refresh admin batch list if admin_logic is available
+                if hasattr(self.app, 'admin_logic') and self.app.admin_logic is not None:
+                    self.app.admin_logic.load_batches()
                 form.destroy()
             except Exception as e:
-                messagebox.showerror("Error", f"Failed to update sample: {e}")
+                messagebox.showerror("Error", f"Failed to update sample or batch status: {e}")
 
         tk.Button(form, text="Save Changes", command=submit_edit).pack(pady=10)
         form.protocol("WM_DELETE_WINDOW", form.destroy)
