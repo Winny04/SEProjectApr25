@@ -1,13 +1,9 @@
-# SEProjectApr25
+ALL the files are needed in order to run GUI.
+Exclude the SE_project.py
 
-# yay :D
+Needed for running:
 
-# lol😎
+pip install firebase-admin pandas python-barcode
+Service account file from firebase. *(each person has their own private key)*
 
-# byeee :)
-
-# sleepy🥱😪
-
-life
-
-# brain broke
+RUN MAIN_APP.py

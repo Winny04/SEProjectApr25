@@ -761,7 +761,9 @@ class UserLogic:
              logging.warning("Notification check attempted when batches are displayed or no MaturationDate column.")
              return
 
-        today = datetime.now()
+        # Make 'today' timezone-naive for consistent comparison
+        today = datetime.now().replace(tzinfo=None) 
+
         notifications = []
 
         for _, row in self.app.data.iterrows():
@@ -784,6 +786,10 @@ class UserLogic:
                 except (ValueError, TypeError):
                     logging.warning(f"Could not parse maturation date for sample: {row.get('DisplaySampleID', 'N/A')}. Value: {mat_date}")
                     continue
+
+            # Ensure mat_date_dt is also timezone-naive before comparison
+            if mat_date_dt and mat_date_dt.tzinfo is not None:
+                mat_date_dt = mat_date_dt.replace(tzinfo=None)
 
             if mat_date_dt:
                 delta = mat_date_dt - today
@@ -1055,7 +1061,7 @@ class UserLogic:
         self.entry_maturation_date_entry.set_date(datetime.now().date()) # Default to today
         current_row += 1
 
-        ttk.Label(frame, text="Status:").grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(frame, text="Status:").grid(row=current_row, column=0, padx=5, pady=5, sticky="e") # Changed to sticky "e"
         self.status_combobox = ttk.Combobox(frame, values=SAMPLE_STATUS_OPTIONS, state="readonly", width=27)
         self.status_combobox.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         self.status_combobox.set(SAMPLE_STATUS_OPTIONS[0]) # Default to "pending approval"
@@ -1121,7 +1127,7 @@ class UserLogic:
             "creation_date": sample_created_date_dt, # Storing datetime object
             "status": sample_status,
             "batch_id": self.current_selected_batch_id,
-            "submitted_by_employee_id": self.app.current_user['employee_id'],
+            "submitted_by_employee_id": self.app.current_user.get('employee_id'),
             "maturation_date": mat_date_dt # Storing datetime object
         }
         logging.debug(f"Sample data prepared: {sample_data}")
