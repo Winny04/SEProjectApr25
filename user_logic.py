@@ -102,46 +102,28 @@ class UserLogic:
         loadmenu.add_command(label="Load All Batches", command=self.load_all_batches_to_tree)
         loadmenu.add_command(label="Load My Batches", command=self.load_my_batches_to_tree)
         menubar.add_cascade(label="Load", menu=loadmenu)
-
-        # Logout button (right-aligned in menubar)
-        logout_menu = tk.Menu(menubar, tearoff=0)
-        logout_menu.add_command(label="Logout", command=self.app.logout)
-        menubar.add_cascade(label="Logout", menu=logout_menu) 
-
+        
         self.root.config(menu=menubar)
 
-        # === Toolbar Frame for Buttons and Pagination ===
-        toolbar = tk.Frame(self.root, pady=10)
-        toolbar.pack(fill="x", padx=10)
+        # === Top Toolbar Frame for Buttons ===
+        toolbar_top = tk.Frame(self.root, pady=10)
+        toolbar_top.pack(fill="x", padx=10)
+
+        # Logout button moved to the top-right of the toolbar
+        ttk.Button(toolbar_top, text="Logout", command=self.app.logout).pack(side=tk.RIGHT, padx=5)
 
         # Standalone "Load Today's Batches" button
-        ttk.Button(toolbar, text="Load Today's Batches", command=self.load_todays_batches_to_tree).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_top, text="Load Today's Batches", command=self.load_todays_batches_to_tree).pack(side=tk.LEFT, padx=5)
 
-        # Pagination Controls for samples
-        pagination_frame = ttk.Frame(toolbar)
-        pagination_frame.pack(side=tk.LEFT, padx=10)
-
-        self.prev_sample_page_btn = ttk.Button(pagination_frame, text="Previous", command=lambda: self.navigate_samples_page('prev'), state=tk.DISABLED)
-        self.prev_sample_page_btn.pack(side=tk.LEFT, padx=2)
-
-        self.page_info_label = ttk.Label(pagination_frame, text="Page 1 of 1")
-        self.page_info_label.pack(side=tk.LEFT, padx=5)
-
-        self.next_sample_page_btn = ttk.Button(pagination_frame, text="Next", command=lambda: self.navigate_samples_page('next'), state=tk.DISABLED)
-        self.next_sample_page_btn.pack(side=tk.LEFT, padx=2)
-        
-        # Existing action buttons
-        ttk.Button(toolbar, text="Generate Barcode", command=self.generate_barcode).pack(side=tk.LEFT, padx=5)
-        ttk.Button(toolbar, text="Check Notifications", command=self.check_notifications).pack(side=tk.LEFT, padx=5)
-        self.add_sample_main_button = ttk.Button(toolbar, text="Add Sample to Batch", command=self.open_batch_selection_screen)
+        # Other action buttons that remain at the top
+        ttk.Button(toolbar_top, text="Check Notifications", command=self.check_notifications).pack(side=tk.LEFT, padx=5)
+        self.add_sample_main_button = ttk.Button(toolbar_top, text="Select Batch", command=self.open_batch_selection_screen)
         self.add_sample_main_button.pack(side=tk.LEFT, padx=5)
-        self.add_single_sample_button = ttk.Button(toolbar, text="Add Single Sample to Current Batch", command=self.open_single_sample_form, state=tk.DISABLED)
+        self.add_single_sample_button = ttk.Button(toolbar_top, text="Add Single Sample to Current Batch", command=self.open_single_sample_form, state=tk.DISABLED)
         self.add_single_sample_button.pack(side=tk.LEFT, padx=5)
-        ttk.Button(toolbar, text="Edit Sample", command=self.edit_sample).pack(side=tk.LEFT, padx=5)
-        ttk.Button(toolbar, text="Delete Sample", command=self.delete_sample).pack(side=tk.LEFT, padx=5)
-        ttk.Button(toolbar, text="Filter Samples/Find Batch", command=self.open_filter_form).pack(side=tk.LEFT, padx=5)
-
-
+        ttk.Button(toolbar_top, text="Edit Sample", command=self.edit_sample).pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_top, text="Delete Sample", command=self.delete_sample).pack(side=tk.LEFT, padx=5)
+        
         # === Treeview for Data Display ===
         # Columns for samples: "DocID", "DisplaySampleID", "Owner", "MaturationDate", "Status", "BatchID", "CreationDate"
         # Columns for batches: "DocID", "BatchID", "ProductName", "Description", "SubmissionDate", "NumberOfSamples"
@@ -188,6 +170,30 @@ class UserLogic:
         self.status_label = tk.Label(self.root, text="Load samples from DB or import Excel.", anchor='w', bd=1, relief=tk.SUNKEN)
         self.status_label.pack(fill=tk.X, padx=10, pady=5)
 
+        # === Bottom Toolbar Frame for Generate Barcode, Pagination, and Filter Button ===
+        bottom_toolbar = tk.Frame(self.root, pady=10)
+        bottom_toolbar.pack(fill="x", padx=10, side=tk.BOTTOM)
+        
+        # Generate Barcode button
+        ttk.Button(bottom_toolbar, text="Generate Barcode", command=self.generate_barcode).pack(side=tk.LEFT, padx=5)
+
+        # Pagination Controls for samples (centered)
+        pagination_frame = ttk.Frame(bottom_toolbar)
+        pagination_frame.pack(side=tk.LEFT, expand=True) # Use expand=True to push it center relative to other elements
+
+        self.prev_sample_page_btn = ttk.Button(pagination_frame, text="Previous", command=lambda: self.navigate_samples_page('prev'), state=tk.DISABLED)
+        self.prev_sample_page_btn.pack(side=tk.LEFT, padx=2)
+
+        self.page_info_label = ttk.Label(pagination_frame, text="Page 1 of 1")
+        self.page_info_label.pack(side=tk.LEFT, padx=5)
+
+        self.next_sample_page_btn = ttk.Button(pagination_frame, text="Next", command=lambda: self.navigate_samples_page('next'), state=tk.DISABLED)
+        self.next_sample_page_btn.pack(side=tk.LEFT, padx=2)
+        
+        # Filter Samples/Find Batch button
+        ttk.Button(bottom_toolbar, text="Filter Samples/Find Batch", command=self.open_filter_form).pack(side=tk.RIGHT, padx=5)
+
+
         # Initial load when dashboard opens
         self.load_samples_paginated(query_type='all_samples', reset=True)
         logging.info("User dashboard loaded.")
@@ -197,9 +203,8 @@ class UserLogic:
         Adjusts column visibility based on context (samples vs batches)."""
         logging.info(f"Populating samples treeview. Pagination Load: {is_pagination_load}, Current Page: {current_page}, Total Pages: {total_pages}")
         # Always clear for a fresh load, or if not a direct pagination "next/prev" click
-        if not is_pagination_load:
-            self.tree.delete(*self.tree.get_children())
-            self.app.data = pd.DataFrame(columns=COLUMNS + ["DocID"]) # Reset DataFrame for new data
+        self.tree.delete(*self.tree.get_children()) # <--- THIS LINE IS THE KEY CHANGE
+        self.app.data = pd.DataFrame(columns=COLUMNS + ["DocID"]) # Reset DataFrame for new data
 
         # Set sample-specific columns visible and batch-specific columns hidden
         sample_cols = ["DisplaySampleID", "Owner", "MaturationDate", "Status", "BatchID", "CreationDate"]
@@ -809,7 +814,7 @@ class UserLogic:
         logging.info("Opening batch selection screen.")
         batch_selection_form = tk.Toplevel(self.root)
         batch_selection_form.title("Select or Create Batch")
-        batch_selection_form.geometry("500x320")
+        batch_selection_form.geometry("450x320")
         batch_selection_form.grab_set()
         batch_selection_form.transient(self.root)
 
@@ -1027,7 +1032,7 @@ class UserLogic:
 
         form = tk.Toplevel(self.root)
         form.title(f"Add Sample to Batch: {self.current_selected_batch_id}")
-        form.geometry("400x300") # Adjusted height as checkbox is removed
+        form.geometry("400x350")
         form.grab_set()
         form.transient(self.root)
 
@@ -1281,7 +1286,7 @@ class UserLogic:
 
         form = tk.Toplevel(self.root)
         form.title(f"Edit Sample {display_sample_id}")
-        form.geometry("300x250") # Adjusted height as checkbox is removed
+        form.geometry("300x450")
         form.grab_set()
         form.transient(self.root)
 
@@ -1403,7 +1408,7 @@ class UserLogic:
         logging.info("Opening filter form.")
         filter_form = tk.Toplevel(self.root)
         filter_form.title("Filter Options")
-        filter_form.geometry("350x500")
+        filter_form.geometry("450x450")
         filter_form.grab_set()
         filter_form.transient(self.root)
 
@@ -1601,7 +1606,7 @@ class UserLogic:
                     self._display_batch_details_window(batch_doc.to_dict())
                     form_window.destroy()
                 else:
-                    logging.info("Batch not found.")
+                    logging.info("Batch Not Found.")
                     messagebox.showinfo("Batch Not Found", f"Batch with ID '{batch_id_to_find}' does not exist.")
             except Exception as e:
                 logging.error(f"Error retrieving batch details for '{batch_id_to_find}': {e}", exc_info=True)
