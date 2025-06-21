@@ -5,6 +5,7 @@ from firebase_setup import db  # Assuming db is initialized from firebase_setup
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from tkcalendar import DateEntry
 
 
 class TesterLogic:
@@ -34,12 +35,14 @@ class TesterLogic:
 
         ttk.Label(tester_frame, text="Maturation Date Start (YYYY-MM-DD):").grid(row=0, column=0, sticky="e", padx=5,
                                                                                  pady=2)
-        self.tester_mat_date_start_entry = ttk.Entry(tester_frame, width=15)
+        self.tester_mat_date_start_entry = DateEntry(tester_frame, width=12, background='darkblue',
+                                                     foreground='white', date_pattern='yyyy-mm-dd')
         self.tester_mat_date_start_entry.grid(row=0, column=1, sticky="ew", padx=5, pady=2)
 
         ttk.Label(tester_frame, text="Maturation Date End (YYYY-MM-DD):").grid(row=0, column=2, sticky="e", padx=5,
                                                                                pady=2)
-        self.tester_mat_date_end_entry = ttk.Entry(tester_frame, width=15)
+        self.tester_mat_date_end_entry = DateEntry(tester_frame, width=12, background='darkblue',
+                                                   foreground='white', date_pattern='yyyy-mm-dd')
         self.tester_mat_date_end_entry.grid(row=0, column=3, sticky="ew", padx=5, pady=2)
 
         ttk.Button(tester_frame, text="Filter Samples", command=self.filter_samples_by_maturation_date).grid(row=0,
@@ -148,32 +151,26 @@ class TesterLogic:
             messagebox.showerror("Error", f"Failed to filter samples: {e}")
 
     def send_reminder_email(self):
-        """Sends reminder emails for samples expiring soon based on the filtered data."""
+        """Sends reminder emails for pending samples using Gmail and App Password."""
         samples_to_remind = []
-        recipients_map = {}  # To store unique recipients and their samples
+        recipients_map = {}
 
-        # Iterate through currently displayed samples in the treeview
         for item_id in self.tester_tree.get_children():
             values = self.tester_tree.item(item_id, "values")
-            # Unpack values based on the column definition in tester_dashboard
             sample_id = values[0]
             owner = values[1]
             maturation_date_str = values[2]
             status = values[3]
             batch_id = values[4]
             product_owner_email = values[5]
-            test_team_email_str = values[6]  # This is a comma-separated string
+            test_team_email_str = values[6]
 
-            # Convert maturation date string back to datetime for comparison
             try:
                 maturation_date = datetime.strptime(maturation_date_str, "%Y-%m-%d")
             except ValueError:
-                continue  # Skip if date format is invalid
+                continue
 
-            # Define "expire soon" logic (e.g., within next 7 days, or within the filtered range)
-            # For this context, let's assume "expire soon" means samples whose maturation_date
-            # falls within the range currently displayed/filtered, and are not yet approved/rejected.
-            if status == "pending":  # Only remind for pending samples
+            if status == "pending":
                 samples_to_remind.append({
                     "sample_id": sample_id,
                     "owner": owner,
@@ -185,78 +182,64 @@ class TesterLogic:
                 })
 
         if not samples_to_remind:
-            messagebox.showinfo("No Reminders",
-                                "No pending samples found within the specified range to send reminders.")
+            messagebox.showinfo("No Reminders", "No pending samples found within the specified range.")
             return
 
-        # Prepare emails for product owners and test team
+        # Prepare email targets
         for sample in samples_to_remind:
             po_email = sample["product_owner_email"]
             tt_emails = sample["test_team_emails"]
 
-            # Add product owner to recipients
             if po_email and po_email != "N/A":
-                if po_email not in recipients_map:
-                    recipients_map[po_email] = []
-                recipients_map[po_email].append(sample)
+                recipients_map.setdefault(po_email, []).append(sample)
 
-            # Add test team to recipients
             for email in tt_emails:
-                if email not in recipients_map:
-                    recipients_map[email] = []
-                recipients_map[email].append(sample)
+                recipients_map.setdefault(email, []).append(sample)
 
         if not recipients_map:
-            messagebox.showinfo("No Recipients", "No valid email recipients found for reminders.")
+            messagebox.showinfo("No Recipients", "No valid email recipients found.")
             return
 
-        # --- Email Sending Logic (Placeholder) ---
-        # NOTE: For actual email sending, you would need to configure an SMTP server.
-        # This is a placeholder and will not send actual emails without proper setup.
-        # Example: Using a dummy SMTP configuration.
-        smtp_server = "smtp.example.com"  # Replace with your SMTP server
-        smtp_port = 587  # Replace with your SMTP port (e.g., 587 for TLS, 465 for SSL)
-        sender_email = "your_email@example.com"  # Replace with your sender email
-        sender_password = "your_password"  # Replace with your email password or app-specific password
+        # --- Real Email Sending via Gmail ---
+        smtp_server = "smtp.gmail.com"
+        smtp_port = 587
+        sender_email = "wyseunice04@gmail.com"
+        app_password = "jgahpcegvqgxahjh"
 
         email_send_success = []
         email_send_fail = []
 
         for recipient_email, samples_for_recipient in recipients_map.items():
             subject = "Reminder: Expiring Samples Requiring Attention"
-            body = f"Dear User,\n\nThe following samples are pending and require your attention as their maturation date is approaching or within the filtered range:\n\n"
+            body = f"Dear User,\n\nThe following samples are pending and require your attention:\n\n"
             for s in samples_for_recipient:
                 body += f"- Sample ID: {s['sample_id']}, Owner: {s['owner']}, Maturation Date: {s['maturation_date']}, Batch ID: {s['batch_id']}\n"
             body += "\nPlease take necessary action.\n\nBest regards,\nSample Management System"
 
             msg = MIMEMultipart()
-            msg['From'] = sender_email
-            msg['To'] = recipient_email
-            msg['Subject'] = subject
-            msg.attach(MIMEText(body, 'plain'))
+            msg["From"] = sender_email
+            msg["To"] = recipient_email
+            msg["Subject"] = subject
+            msg.attach(MIMEText(body, "plain"))
 
             try:
-                # This part requires a live SMTP server and correct credentials
-                # with smtplib.SMTP(smtp_server, smtp_port) as server:
-                #     server.starttls()  # Start TLS encryption
-                #     server.login(sender_email, sender_password)
-                #     server.send_message(msg)
-                # For now, we simulate success
-                print(f"Simulating email sent to {recipient_email} for {len(samples_for_recipient)} samples.")
-                email_send_success.append(recipient_email)
+                with smtplib.SMTP(smtp_server, smtp_port) as server:
+                    server.starttls()
+                    server.login(sender_email, app_password)
+                    server.send_message(msg)
+                    email_send_success.append(recipient_email)
             except Exception as e:
                 email_send_fail.append(f"{recipient_email} ({e})")
-                messagebox.showerror("Email Error", f"Failed to send email to {recipient_email}: {e}")
 
         if email_send_success:
             messagebox.showinfo("Reminder Sent",
-                                f"Reminder emails simulated/sent successfully to: {', '.join(email_send_success)}")
-        if email_send_fail:
-            messagebox.showwarning("Email Send Failure",
-                                   f"Failed to send emails to some recipients:\n{'\n'.join(email_send_fail)}")
+                                f"Emails sent to: {', '.join(email_send_success)}")
 
-        messagebox.showinfo("Reminder Process Complete",
-                            "Reminder email process finished. Check console for simulated sends.")
+        if email_send_fail:
+            messagebox.showwarning("Some Failed",
+                                   f"Some emails failed:\n{chr(10).join(email_send_fail)}")
+
+        messagebox.showinfo("Done", "Reminder email process completed.")
 
     def toggle_batch_fields(self, parent_frame, is_existing_batch_selected):
         """Toggles the visibility/state of new/existing batch fields. (Placeholder for other modules)"""
