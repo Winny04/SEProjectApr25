@@ -7,8 +7,9 @@ EMPLOYEE_ID_REGEX = re.compile(r"^E\d+$")
 
 NOTIFICATION_DAYS_BEFORE = 60 # 2 months approx.
 
-# Expected columns for Excel data, 'Status' will be added if not present
-# Note: These columns are primarily for local Excel import/export and Treeview display.
-# Firestore documents will have their own fields.
-# constants.py
+# Default columns for displaying samples in Treeview
+# Note: 'DocID' is for internal Firestore document ID, 'DisplaySampleID' is the user-facing ID
 COLUMNS = ["SampleID", "Owner", "MaturationDate", "Status", "BatchID", "ProductName", "Description", "TestDate", "UserEmployeeID", "UserUsername", "UserEmail", "SubmissionDate", "NumberOfSamples"]
+
+# Status options for samples
+SAMPLE_STATUS_OPTIONS = ["pending approval", "approved", "rejected", "pending test", "tested"]
