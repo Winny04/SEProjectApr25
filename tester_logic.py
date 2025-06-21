@@ -203,8 +203,8 @@ class TesterLogic:
         # --- Real Email Sending via Gmail ---
         smtp_server = "smtp.gmail.com"
         smtp_port = 587
-        sender_email = "wyseunice04@gmail.com"
-        app_password = "jgahpcegvqgxahjh"
+        sender_email = "test.dept7@gmail.com"
+        app_password = "gicklxfdonaszuzh"
 
         email_send_success = []
         email_send_fail = []
