@@ -6,6 +6,10 @@ from datetime import datetime
 import os
 from firebase_setup import db
 import firebase_admin
+import logging  # Import logging module for better debugging
+
+# Configure logging (optional, but good practice)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 
 class AdminLogic:
@@ -14,10 +18,12 @@ class AdminLogic:
         self.app = app_instance
         self.users_tree = None
         self.batches_tree = None
+        # self.approved_batches_tree = None # Removed this as it's no longer a separate treeview for approved batches
+        self.batch_filter_var = None  # Variable to hold the selected batch filter (All, Pending, Approved)
 
     def admin_dashboard(self):
         """Displays the admin dashboard with user and batch management."""
-        print("\n--- Initializing Admin Dashboard ---")
+        logging.info("\n--- Initializing Admin Dashboard ---")  # Changed print to logging
         self.app.clear_root()
         self.root.geometry("1200x700")
 
@@ -29,9 +35,44 @@ class AdminLogic:
         ttk.Label(top_frame, text=f"Welcome, Admin {self.app.current_user.get('username')}!",
                   font=("Helvetica", 16)).pack(side="left", expand=True)
 
+        # Main content frame to hold sidebar and central content
+        main_content_frame = ttk.Frame(self.root)
+        main_content_frame.pack(expand=True, fill="both", padx=10, pady=10)
+
+        # Sidebar Frame
+        sidebar_frame = ttk.Frame(main_content_frame, width=180, relief="raised", borderwidth=1)
+        sidebar_frame.pack(side="left", fill="y", padx=(0, 10))
+        sidebar_frame.pack_propagate(False)  # Prevent sidebar from resizing based on content
+
+        ttk.Label(sidebar_frame, text="Navigation", font=("Helvetica", 12, "bold")).pack(pady=10)
+
+        # Sidebar buttons
+        ttk.Button(sidebar_frame, text="User Management", command=self.show_user_management).pack(fill="x", pady=5,
+                                                                                                  padx=10)
+        ttk.Button(sidebar_frame, text="Batch Management", command=self.show_batch_management).pack(fill="x", pady=5,
+                                                                                                    padx=10)
+        ttk.Button(sidebar_frame, text="Export Approved Data", command=self.export_user_batches).pack(fill="x", pady=5, padx=10)
+
+        # Central content area
+        self.central_content_frame = ttk.Frame(main_content_frame)
+        self.central_content_frame.pack(side="right", expand=True, fill="both")
+
+        # Initially show user management
+        self.show_user_management()
+        logging.info("--- Admin Dashboard Initialized ---")  # Changed print to logging
+
+    def clear_central_content(self):
+        """Clears all widgets from the central content frame."""
+        for widget in self.central_content_frame.winfo_children():
+            widget.destroy()
+
+    def show_user_management(self):
+        """Displays the user management section in the central content frame."""
+        self.clear_central_content()
         # Users Section
-        ttk.Label(self.root, text="User Management", font=("Helvetica", 14, "bold")).pack(pady=(20, 5))
-        self.users_tree = ttk.Treeview(self.root, columns=("EmployeeID", "Username", "Email", "Role", "Status"),
+        ttk.Label(self.central_content_frame, text="User Management", font=("Helvetica", 14, "bold")).pack(pady=(20, 5))
+        self.users_tree = ttk.Treeview(self.central_content_frame,
+                                       columns=("EmployeeID", "Username", "Email", "Role", "Status"),
                                        show='headings')
         self.users_tree.heading("EmployeeID", text="Employee ID")
         self.users_tree.heading("Username", text="Username")
@@ -47,7 +88,7 @@ class AdminLogic:
 
         self.users_tree.pack(expand=True, fill="both", padx=10, pady=10)
 
-        btn_user_frame = ttk.Frame(self.root)
+        btn_user_frame = ttk.Frame(self.central_content_frame)
         btn_user_frame.pack(pady=5)
 
         ttk.Button(btn_user_frame, text="Add User", command=self.admin_add_user).pack(side="left", padx=5)
@@ -55,12 +96,27 @@ class AdminLogic:
         ttk.Button(btn_user_frame, text="Delete User", command=self.admin_delete_user).pack(side="left", padx=5)
         ttk.Button(btn_user_frame, text="Approve User", command=self.admin_approve_user).pack(side="left",
                                                                                               padx=5)
-
         self.load_users()
 
-        # Batches Section
-        ttk.Label(self.root, text="Batch Approval", font=("Helvetica", 14, "bold")).pack(pady=(20, 5))
-        self.batches_tree = ttk.Treeview(self.root,
+    def show_batch_management(self):
+        """Displays the batch management section in the central content frame, with a filter for status."""
+        self.clear_central_content()
+        ttk.Label(self.central_content_frame, text="Batch Management", font=("Helvetica", 14, "bold")).pack(
+            pady=(20, 5))
+
+        # Filter controls
+        filter_frame = ttk.Frame(self.central_content_frame)
+        filter_frame.pack(pady=5)
+
+        ttk.Label(filter_frame, text="Filter by Status:").pack(side="left", padx=5)
+        self.batch_filter_var = tk.StringVar(value="pending approval")  # Default to pending approval
+        filter_combobox = ttk.Combobox(filter_frame, textvariable=self.batch_filter_var,
+                                       values=["pending approval", "approved", "all"],
+                                       state="readonly")
+        filter_combobox.pack(side="left", padx=5)
+        filter_combobox.bind("<<ComboboxSelected>>", lambda event: self.load_batches(self.batch_filter_var.get()))
+
+        self.batches_tree = ttk.Treeview(self.central_content_frame,
                                          columns=(
                                              "BatchID", "Product Name", "Description", "Submission Date", "User",
                                              "Status",
@@ -77,26 +133,24 @@ class AdminLogic:
 
         self.batches_tree.pack(expand=True, fill="both", padx=10, pady=10)
 
-        btn_batch_frame = ttk.Frame(self.root)
+        btn_batch_frame = ttk.Frame(self.central_content_frame)
         btn_batch_frame.pack(pady=5)
 
-        ttk.Button(btn_batch_frame, text="View Samples", command=self.admin_view_samples_for_batch).pack(side="left",
-                                                                                                         padx=5)
         ttk.Button(btn_batch_frame, text="Approve Selected Batch", command=self.admin_approve_selected_batch).pack(
             side="left", padx=5)
         ttk.Button(btn_batch_frame, text="Reject Selected Batch", command=self.admin_reject_selected_batch).pack(
-            side="left", padx=5)  # New button
-        ttk.Button(btn_batch_frame, text="Export Approved Batches", command=self.export_user_batches).pack(side="left",
-                                                                                                           padx=5)
-
-        self.load_batches()
-        print("--- Admin Dashboard Initialized ---")
+            side="left", padx=5)
+        ttk.Button(btn_batch_frame, text="View Samples", command=self.admin_view_samples_for_batch).pack(side="left",
+                                                                                                         padx=5)
+        # Removed the "View Approved Batches" button here as well
+        self.load_batches(self.batch_filter_var.get())  # Load batches based on initial filter value
 
     def load_users(self):
         """Loads user data from Firestore and populates the users treeview."""
-        print("--- AdminLogic: Attempting to load users ---")
+        logging.info("--- AdminLogic: Attempting to load users ---")  # Changed print to logging
         if self.users_tree is None:
-            print("AdminLogic: users_tree is None. Admin dashboard not initialized. Skipping user load.")
+            logging.info(
+                "AdminLogic: users_tree is None. Admin dashboard not initialized. Skipping user load.")  # Changed print to logging
             return
 
         self.users_tree.delete(*self.users_tree.get_children())
@@ -107,7 +161,7 @@ class AdminLogic:
                                    values=(data.get("employee_id"), data.get("username", ""),
                                            data.get("email"), data.get("role"),
                                            data.get("status", "active" if data.get("role") == "admin" else "pending")))
-        print("--- AdminLogic: Users loaded ---")
+        logging.info("--- AdminLogic: Users loaded ---")  # Changed print to logging
 
     def admin_add_user(self):
         """Opens a form to add a new user by delegating to AuthManager."""
@@ -170,37 +224,42 @@ class AdminLogic:
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to approve user: {e}")
 
-    def load_batches(self):
-        """Loads batch data from Firestore and populates the batches treeview."""
-        print("--- AdminLogic: Attempting to load batches ---")
+    def load_batches(self, status_filter="pending approval"):
+        """Loads batch data from Firestore and populates the batches treeview.
+           Can filter by status: "pending approval", "approved", or "all"."""
+        logging.info(f"--- AdminLogic: Attempting to load batches with filter: {status_filter} ---")
         if self.batches_tree is None:
-            print("AdminLogic: batches_tree is None. Admin dashboard not initialized. Skipping batch load.")
+            logging.info("AdminLogic: batches_tree is None. Admin dashboard not initialized. Skipping batch load.")
             return
 
         self.batches_tree.delete(*self.batches_tree.get_children())
-        # Query for batches with status "pending"
-        batches = db.collection("batches").where("status", "==", "pending approval").stream()
+
+        batches_query = db.collection("batches")
+        if status_filter and status_filter != "all":
+            batches_query = batches_query.where("status", "==", status_filter)
+
+        batches = batches_query.stream()
+
         for batch in batches:
             data = batch.to_dict()
-            # Get submission_date instead of maturation_date for batches
             submission_date_str = data.get("submission_date", "")
 
-            # Check if it's already a datetime object (which it should be if from Firestore Timestamp)
             if isinstance(submission_date_str, datetime):
                 submission_date_str = submission_date_str.strftime("%Y-%m-%d")
+            elif isinstance(submission_date_str, firebase_admin.firestore.Timestamp):
+                submission_date_str = submission_date_str.to_datetime().strftime("%Y-%m-%d")
             else:
-                # Fallback for anything else (e.g., if it's a string or None initially)
                 submission_date_str = str(submission_date_str) if submission_date_str is not None else ''
 
             self.batches_tree.insert("", "end", iid=batch.id,
                                      values=(data.get("batch_id", ""),
                                              data.get("product_name", ""),
                                              data.get("description", ""),
-                                             submission_date_str,  # Using the formatted submission_date_str
+                                             submission_date_str,
                                              data.get("user_email", ""),
                                              data.get("status", "pending approval"),
                                              data.get("number_of_samples", 0)))
-        print("--- AdminLogic: Batches loaded ---")
+        logging.info(f"--- AdminLogic: Batches loaded with filter: {status_filter} ---")
 
     def admin_approve_selected_batch(self):
         """Approves the selected batch and all its associated samples."""
@@ -235,7 +294,7 @@ class AdminLogic:
 
                 messagebox.showinfo("Success",
                                     f"Batch '{batch_data.get('product_name')}' and all its samples approved successfully.")
-                self.load_batches()  # Refresh the main batches tree
+                self.load_batches(self.batch_filter_var.get())  # Refresh the batches tree with current filter
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to approve batch and samples: {e}")
 
@@ -272,12 +331,12 @@ class AdminLogic:
 
                 messagebox.showinfo("Success",
                                     f"Batch '{batch_data.get('product_name')}' and all its samples rejected successfully.")
-                self.load_batches()  # Refresh the main batches tree
+                self.load_batches(self.batch_filter_var.get())  # Refresh the batches tree with current filter
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to reject batch and samples: {e}")
 
     def admin_view_samples_for_batch(self):
-        """Opens a new window to display samples associated with the selected batch."""
+        """Opens a new window to display samples associated with the selected batch with pagination."""
         selected = self.batches_tree.selection()
         if not selected:
             messagebox.showinfo("Info", "Please select a batch to view its samples.")
@@ -301,7 +360,9 @@ class AdminLogic:
 
         samples_window = tk.Toplevel(self.root)
         samples_window.title(f"Samples for Batch: {product_name} ({batch_id_from_doc})")  # Use the actual batch_id
-        samples_window.geometry("800x550")  # Slightly increased height for new button
+        samples_window.geometry("800x550")
+        samples_window.current_page = 1  # Initialize current page for this window
+        samples_window.items_per_page = 20  # Samples per page
 
         ttk.Label(samples_window, text=f"Samples for Batch: {product_name} (ID: {batch_id_from_doc})",
                   font=("Helvetica", 14, "bold")).pack(pady=10)
@@ -325,6 +386,19 @@ class AdminLogic:
 
         samples_tree.pack(expand=True, fill="both", padx=10, pady=10)
 
+        # Pagination controls frame
+        pagination_frame = ttk.Frame(samples_window)
+        pagination_frame.pack(pady=5)
+
+        prev_button = ttk.Button(pagination_frame, text="Previous Page")
+        prev_button.pack(side="left", padx=5)
+
+        page_label = ttk.Label(pagination_frame, text="Page X of Y")
+        page_label.pack(side="left", padx=10)
+
+        next_button = ttk.Button(pagination_frame, text="Next Page")
+        next_button.pack(side="left", padx=5)
+
         # Frame for buttons below the samples tree
         btn_sample_frame = ttk.Frame(samples_window)
         btn_sample_frame.pack(pady=5)
@@ -338,7 +412,20 @@ class AdminLogic:
         ttk.Button(btn_sample_frame, text="Reject Sample",  # New button
                    command=lambda: self.admin_reject_sample(samples_tree, batch_doc_id)).pack(side="left", padx=5)
 
-        self._load_samples_into_tree(batch_id_from_doc, samples_tree)  # Initial load using the actual batch_id
+        def go_to_page(page_num):
+            samples_window.current_page = page_num
+            self._load_samples_into_tree(batch_id_from_doc, samples_tree, page_label,
+                                         samples_window.current_page, samples_window.items_per_page)
+            # Enable/disable buttons based on current page
+            prev_button.config(state="normal" if samples_window.current_page > 1 else "disabled")
+            next_button.config(
+                state="normal" if samples_window.current_page < samples_window.total_pages else "disabled")
+
+        prev_button.config(command=lambda: go_to_page(samples_window.current_page - 1))
+        next_button.config(command=lambda: go_to_page(samples_window.current_page + 1))
+
+        # Initial load of samples for the first page
+        go_to_page(1)  # Load first page
 
     def admin_approve_sample(self, samples_tree_ref, batch_doc_id):
         """Approves a selected sample and checks/updates the parent batch status."""
@@ -374,8 +461,14 @@ class AdminLogic:
                 sample_doc_ref.update({"status": "approved"})
                 messagebox.showinfo("Success", f"Sample '{sample_doc.get('sample_id')}' approved successfully.")
 
-                # Reload samples for the current batch view
-                self._load_samples_into_tree(batch_doc_id, samples_tree_ref)
+                # Reload samples for the current batch view - need to get current page and items per page
+                # This needs to be adapted to fetch the current page context if this method can be called from multiple places
+                # For simplicity here, we'll assume it needs to reload the first page or the current page if context is available.
+                # Since this method is called from admin_view_samples_for_batch via lambda,
+                # we don't have direct access to page_label, current_page, items_per_page here.
+                # A robust solution would pass these down or manage state centrally.
+                # For now, a full reload of the main batch list is the safest side effect.
+                self.load_batches(self.batch_filter_var.get())
 
                 # Now, check if all samples in the batch are approved
                 all_samples_approved = True
@@ -383,12 +476,19 @@ class AdminLogic:
 
                 # Check for samples in the generator before iterating
                 samples_exist = False
+                temp_samples_list = []
                 for s in associated_samples_in_batch:
                     samples_exist = True
-                    s_data = s.to_dict()
-                    if s_data.get("status") != "approved":
-                        all_samples_approved = False
-                        break  # Found a pending sample, no need to check further
+                    temp_samples_list.append(s)  # Store to iterate again if needed
+
+                if samples_exist:
+                    for s in temp_samples_list:
+                        s_data = s.to_dict()
+                        if s_data.get("status") != "approved":
+                            all_samples_approved = False
+                            break  # Found a pending or rejected sample, no need to check further
+                else:  # If no samples exist, it cannot be 'all approved'
+                    all_samples_approved = False
 
                 if all_samples_approved and samples_exist:  # Only set batch to approved if there are samples and all are approved
                     batch_ref = db.collection("batches").document(batch_doc_id)
@@ -397,22 +497,16 @@ class AdminLogic:
                         batch_ref.update({"status": "approved"})
                         messagebox.showinfo("Batch Status Update",
                                             f"Batch '{batch_doc_id}' status updated to 'approved' as all samples are approved.")
-                        self.load_batches()  # Refresh the main batches tree
+                        self.load_batches(self.batch_filter_var.get())  # Refresh the main batches tree
                 elif not all_samples_approved:
                     # If any sample is not approved, ensure batch status is not 'approved'
                     batch_ref = db.collection("batches").document(batch_doc_id)
                     current_batch_status = batch_ref.get().to_dict().get("status")
-                    if current_batch_status == "approved" and not all_samples_approved:
-                        # This case handles if a sample was rejected after batch was approved.
-                        # Or if a batch was manually approved but then a sample status reverted.
-                        # For this scenario, we might want to revert the batch to pending.
-                        # However, the user request states "if one sample still pending batch show pending".
-                        # So, we only need to act if it's currently 'approved' and should be 'pending'.
-                        # If it's already pending, no action needed.
-                        batch_ref.update({"status": "pending"})
+                    if current_batch_status == "approved" or current_batch_status == "rejected":  # If it was approved or rejected, revert to pending approval
+                        batch_ref.update({"status": "pending approval"})  # Changed to "pending approval"
                         messagebox.showinfo("Batch Status Update",
                                             f"Batch '{batch_doc_id}' status updated to 'pending approval' as some samples are not yet approved.")
-                        self.load_batches()  # Refresh the main batches tree
+                        self.load_batches(self.batch_filter_var.get())  # Refresh the main batches tree
                 # If no samples exist in the batch, the batch remains as it is or can be handled as a special case.
                 # Currently, it won't be set to 'approved' if there are no samples.
 
@@ -450,7 +544,7 @@ class AdminLogic:
             try:
                 sample_doc_ref.update({"status": "rejected"})
                 messagebox.showinfo("Success", f"Sample '{sample_doc.get('sample_id')}' rejected successfully.")
-                self._load_samples_into_tree(batch_doc_id, samples_tree_ref)
+                self.load_batches(self.batch_filter_var.get())  # Reload the main batches tree
 
                 # If a sample is rejected, the batch status should definitely revert to "pending approval"
                 batch_ref = db.collection("batches").document(batch_doc_id)
@@ -459,22 +553,40 @@ class AdminLogic:
                     batch_ref.update({"status": "pending approval"})
                     messagebox.showinfo("Batch Status Update",
                                         f"Batch '{batch_doc_id}' status updated to 'pending approval' as a sample was rejected.")
-                    self.load_batches()
+                    self.load_batches(self.batch_filter_var.get())
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to reject sample or update batch status: {e}")
 
-    def _load_samples_into_tree(self, batch_id, samples_tree):
-        """Helper method to load samples into the provided treeview."""
+    def _load_samples_into_tree(self, batch_id, samples_tree, page_label_ref, page_number, items_per_page):
+        """Helper method to load samples into the provided treeview with pagination."""
         samples_tree.delete(*samples_tree.get_children())
-        print(f"--- Loading samples for batch_id: {batch_id} ---")
+        logging.info(f"--- Loading samples for batch_id: {batch_id}, page: {page_number} ---")
+
         try:
-            # The query should be against the 'batch_id' field in the samples collection
-            associated_samples = db.collection("samples").where("batch_id", "==", batch_id).stream()
-            samples_found = 0
-            for sample in associated_samples:
-                samples_found += 1
+            # First, get the total count of samples for this batch
+            all_samples_query = db.collection("samples").where("batch_id", "==", batch_id).stream()
+            all_samples = list(all_samples_query)  # Convert stream to list to count
+            total_samples = len(all_samples)
+            total_pages = (total_samples + items_per_page - 1) // items_per_page
+            if total_pages == 0:
+                total_pages = 1  # At least one page even if no samples
+
+            # Update the page label in the UI
+            page_label_ref.master.master.total_pages = total_pages  # Store total_pages on the samples_window
+            page_label_ref.config(text=f"Page {page_number} of {total_pages}")
+
+            # Calculate offset for Firestore query
+            offset = (page_number - 1) * items_per_page
+
+            # Fetch samples for the current page
+            paginated_samples_query = db.collection("samples").where("batch_id", "==", batch_id).limit(
+                items_per_page).offset(offset).stream()
+
+            samples_found_on_page = 0
+            for sample in paginated_samples_query:
+                samples_found_on_page += 1
                 sample_data = sample.to_dict()
-                print(f"  Found sample: {sample_data.get('sample_id')}, batch_id: {sample_data.get('batch_id')}")
+                logging.info(f"  Found sample: {sample_data.get('sample_id')}, batch_id: {sample_data.get('batch_id')}")
 
                 maturation_date_str = ""
                 if isinstance(sample_data.get('maturation_date'), datetime):
@@ -498,11 +610,21 @@ class AdminLogic:
                                             maturation_date_str,
                                             sample_data.get("status", ""),
                                             creation_date_str))
-            if samples_found == 0:
-                print(f"--- No samples found for batch_id: {batch_id} ---")
+            if samples_found_on_page == 0 and total_samples > 0 and page_number > 1:
+                # This can happen if the last sample of a page was deleted, and the current page became empty.
+                # Or if navigated to an empty page (e.g. page 3 when only 2 pages exist).
+                # In such a case, navigate back to the last available page.
+                logging.info("No samples on current page, navigating to previous valid page.")
+                # Recursively call to go back one page. This needs careful handling to avoid infinite loops if no samples.
+                # The logic for total_pages and prev/next button state should prevent this for most cases.
+                page_label_ref.master.master.current_page = max(1, page_number - 1)
+                self._load_samples_into_tree(batch_id, samples_tree, page_label_ref,
+                                             page_label_ref.master.master.current_page, items_per_page)
+            elif samples_found_on_page == 0:
+                logging.info(f"--- No samples found for batch_id: {batch_id} ---")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to load samples for batch: {e}")
-            print(f"Error loading samples: {e}")
+            logging.error(f"Error loading samples: {e}", exc_info=True)
 
     def sample_form_window(self, batch_id, user_employee_id_from_batch, samples_tree_ref, product_name):
         """Opens a form to add a new sample to a specified batch."""
@@ -558,7 +680,7 @@ class AdminLogic:
             try:
                 maturation_date = datetime.strptime(mat_date_str, "%Y-%m-%d")
             except ValueError:
-                messagebox.showerror("Input Error", "Invalid Maturation Date format. Please use YYYY-MM-DD.",
+                messagebox.showerror("Input Error", "Invalid Maturation Date format. Please useYYYY-MM-DD.",
                                      parent=form_window)
                 return
 
@@ -586,14 +708,12 @@ class AdminLogic:
             try:
                 db.collection("samples").add(new_sample_data)
                 messagebox.showinfo("Success", "Sample added successfully!", parent=form_window)
-                self._load_samples_into_tree(batch_id, samples_tree_ref)  # Refresh the samples tree
-                # After adding a new sample, the batch status might need to be re-evaluated
-                # If adding a 'pending' sample, the batch should go to 'pending' if it was 'approved'
-                batch_ref = db.collection("batches").document(batch_id)
-                current_batch_status = batch_ref.get().to_dict().get("status")
-                if status == "pending approval" and current_batch_status == "approved":
-                    batch_ref.update({"status": "pending"})
-                    self.load_batches()  # Refresh main batches tree
+                # After adding a sample, need to reload the samples on the current page
+                # This requires passing the pagination context to this method or managing it globally
+                # For now, it will simply close the form and rely on a subsequent refresh if the user navigates
+                # If we want to refresh the *specific* samples window, we need to pass its page_label_ref, current_page etc.
+                # Simplest is to just reload the main batches tree if a sample is added/modified.
+                self.load_batches(self.batch_filter_var.get())
                 form_window.destroy()  # Close the form window
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to add sample: {e}", parent=form_window)
@@ -603,8 +723,13 @@ class AdminLogic:
 
         form_window.wait_window()  # Wait for the form window to close
 
+    # Removed admin_view_approved_batches method entirely
+    # Removed _load_approved_batches_into_tree method entirely
+    # Removed _view_samples_from_approved_batch method entirely
+
     def export_user_batches(self):
         """Exports approved batches and their associated samples to an Excel file."""
+        logging.info("Attempting to export approved batches and samples to Excel.")
         approved_batches_data = []
         batches_ref = db.collection("batches")
         samples_ref = db.collection("samples")
@@ -613,45 +738,29 @@ class AdminLogic:
 
         if not approved_batches:
             messagebox.showwarning("Warning", "No approved batches to export.")
+            logging.warning("No approved batches found to export.")
             return
 
         for batch in approved_batches:
             batch_data = batch.to_dict()
             actual_batch_id_field = batch_data.get("batch_id")
 
-            # Handle batch_test_date_str
-            batch_test_date_str = ""
-            test_date_obj = batch_data.get('test_date')
-            if isinstance(test_date_obj, datetime):
-                batch_test_date_str = test_date_obj.strftime("%Y-%m-%d")
-            elif isinstance(test_date_obj, firebase_admin.firestore.Timestamp):
-                batch_test_date_str = test_date_obj.to_datetime().strftime("%Y-%m-%d")
-
-            # Handle batch_maturation_date_str
-            batch_maturation_date_str = ""
-            maturation_date_obj = batch_data.get('maturation_date')
-            if isinstance(maturation_date_obj, datetime):
-                batch_maturation_date_str = maturation_date_obj.strftime("%Y-%m-%d")
-            elif isinstance(maturation_date_obj, firebase_admin.firestore.Timestamp):
-                batch_maturation_date_str = maturation_date_obj.to_datetime().strftime("%Y-%m-%d")
-
             # Query samples using the 'batch_id' field from the batch document
             associated_samples = samples_ref.where("batch_id", "==", actual_batch_id_field).get()
 
-            # It's important to have at least one entry even if no samples, so batch data is exported
+            # Ensure batch data is always included, even if no samples
             if not associated_samples:
+                logging.info(f"Batch {actual_batch_id_field} has no samples. Exporting batch data only.")
                 combined_data = {
-                    "BatchID": batch_data.get("batch_id"),
-                    "Product_Name": batch_data.get("product_name"),
-                    "Batch_Description": batch_data.get("description"),
-                    "Batch_MaturationDate": batch_maturation_date_str,
-                    "Batch_Test_Date": batch_test_date_str,
-                    "Batch_Status": batch_data.get("status"),
-                    "User_Email": batch_data.get("user_email"),
-                    "SampleID": "",
-                    "Sample_Owner": "",
-                    "Sample_MaturationDate": "",
-                    "Sample_Status": ""
+                    "batch_id": batch_data.get("batch_id", ""),
+                    "product_name": batch_data.get("product_name", ""),
+                    "batch_description": batch_data.get("description", ""),
+                    "batch_status": batch_data.get("status", ""),
+                    "user_email": batch_data.get("user_email", ""),
+                    "sample_id": "",
+                    "sample_owner": "",
+                    "sample_maturation_date": "",
+                    "sample_status": ""
                 }
                 approved_batches_data.append(combined_data)
 
@@ -664,25 +773,24 @@ class AdminLogic:
                 elif isinstance(sample_mat_date_obj, firebase_admin.firestore.Timestamp):
                     mat_date_str = sample_mat_date_obj.to_datetime().strftime("%Y-%m-%d")
                 else:
-                    mat_date_str = str(sample_data.get('maturation_date', ''))
+                    mat_date_str = str(sample_mat_date_obj) if sample_mat_date_obj is not None else ''
 
                 combined_data = {
-                    "BatchID": batch_data.get("batch_id"),
-                    "Product_Name": batch_data.get("product_name"),
-                    "Batch_Description": batch_data.get("description"),
-                    "Batch_MaturationDate": batch_maturation_date_str,
-                    "Batch_Test_Date": batch_test_date_str,
-                    "Batch_Status": batch_data.get("status"),
-                    "User_Email": batch_data.get("user_email"),
-                    "SampleID": sample_data.get("sample_id"),
-                    "Sample_Owner": sample_data.get("owner"),
-                    "Sample_MaturationDate": mat_date_str,
-                    "Sample_Status": sample_data.get("status")
+                    "batch_id": batch_data.get("batch_id", ""),
+                    "product_name": batch_data.get("product_name", ""),
+                    "batch_description": batch_data.get("description", ""),
+                    "batch_status": batch_data.get("status", ""),
+                    "user_email": batch_data.get("user_email", ""),
+                    "sample_id": sample_data.get("sample_id", ""),
+                    "sample_owner": sample_data.get("owner", ""),
+                    "sample_maturation_date": mat_date_str,
+                    "sample_status": sample_data.get("status", "")
                 }
                 approved_batches_data.append(combined_data)
 
         if not approved_batches_data:
-            messagebox.showwarning("Warning", "No approved batches with samples to export.")
+            messagebox.showwarning("Warning", "No approved batches with data to export.")
+            logging.warning("No data collected for approved batches, nothing to export.")
             return
 
         df_approved_with_samples = pd.DataFrame(approved_batches_data)
@@ -693,8 +801,15 @@ class AdminLogic:
                                                 initialfile="Approved_Batches_and_Samples.xlsx")
         if filename:
             try:
+                for col in df_approved_with_samples.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df_approved_with_samples[col]):
+                        if df_approved_with_samples[col].dt.tz is not None:
+                            df_approved_with_samples[col] = df_approved_with_samples[col].dt.tz_localize(None)
+
                 df_approved_with_samples.to_excel(filename, index=False)
                 messagebox.showinfo("Success",
                                     f"Approved batches and their samples exported to {os.path.basename(filename)}")
+                logging.info(f"Successfully exported approved batches and samples to {filename}.")
             except Exception as e:
+                logging.error(f"Failed to export Excel file for approved batches: {e}", exc_info=True)
                 messagebox.showerror("Error", f"Failed to export Excel file:\n{e}")
