@@ -76,9 +76,12 @@ class TesterLogic:
         tree_frame = ttk.Frame(self.root)
         tree_frame.pack(expand=True, fill="both", padx=10, pady=10)
 
-        self.tester_tree = ttk.Treeview(tree_frame, columns=(
-        "SampleID", "Owner", "MaturationDate", "Status", "BatchID", "ProductOwnerEmail", "TestTeamEmail"),
-                                         show='headings')
+        self.tester_tree = ttk.Treeview(self.root, columns=(
+            "SampleID", "Owner", "MaturationDate", "Status", "BatchID", "ProductOwnerEmail", "TestTeamEmail"
+        ), show='headings')
+        self.tester_tree.tag_configure("today", background="salmon")
+        self.tester_tree.tag_configure("urgent", background="khaki")
+
         self.tester_tree.heading("SampleID", text="Sample ID")
         self.tester_tree.heading("Owner", text="Sample Owner")
         self.tester_tree.heading("MaturationDate", text="Maturation Date")
@@ -192,7 +195,7 @@ class TesterLogic:
                 if days_left == 0:
                     tags = ('today',)
                     logging.debug(f"Sample {data.get('sample_id', '')} tagged as 'today'.")
-                elif 0 < days_left <= 3:
+                elif 0 < days_left <= 7:
                     tags = ('urgent',)
                     logging.debug(f"Sample {data.get('sample_id', '')} tagged as 'urgent'.")
 
