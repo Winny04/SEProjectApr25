@@ -80,7 +80,12 @@ class AdminLogic:
         btn_batch_frame = ttk.Frame(self.root)
         btn_batch_frame.pack(pady=5)
 
-        ttk.Button(btn_batch_frame, text="View Samples", command=self.admin_view_samples_for_batch).pack(side="left", padx=5) # New button
+        ttk.Button(btn_batch_frame, text="View Samples", command=self.admin_view_samples_for_batch).pack(side="left",
+                                                                                                         padx=5)
+        ttk.Button(btn_batch_frame, text="Approve Selected Batch", command=self.admin_approve_selected_batch).pack(
+            side="left", padx=5)
+        ttk.Button(btn_batch_frame, text="Reject Selected Batch", command=self.admin_reject_selected_batch).pack(
+            side="left", padx=5)  # New button
         ttk.Button(btn_batch_frame, text="Export Approved Batches", command=self.export_user_batches).pack(side="left",
                                                                                                            padx=5)
 
@@ -197,6 +202,80 @@ class AdminLogic:
                                              data.get("number_of_samples", 0)))
         print("--- AdminLogic: Batches loaded ---")
 
+    def admin_approve_selected_batch(self):
+        """Approves the selected batch and all its associated samples."""
+        selected = self.batches_tree.selection()
+        if not selected:
+            messagebox.showinfo("Info", "Please select a batch to approve.")
+            return
+
+        batch_doc_id = selected[0]
+        batch_doc = db.collection("batches").document(batch_doc_id).get()
+
+        if not batch_doc.exists:
+            messagebox.showerror("Error", "Selected batch not found.")
+            return
+
+        batch_data = batch_doc.to_dict()
+        if batch_data.get("status") == "approved":
+            messagebox.showinfo("Info", "Batch is already approved.")
+            return
+
+        confirm = messagebox.askyesno("Confirm Batch Approval",
+                                      f"Are you sure you want to approve batch '{batch_data.get('product_name')}' (ID: {batch_data.get('batch_id')}) and all its samples?")
+        if confirm:
+            try:
+                # Update batch status to approved
+                db.collection("batches").document(batch_doc_id).update({"status": "approved"})
+
+                # Also approve all samples associated with this batch
+                associated_samples = db.collection("samples").where("batch_id", "==", batch_doc_id).stream()
+                for sample in associated_samples:
+                    sample.reference.update({"status": "approved"})
+
+                messagebox.showinfo("Success",
+                                    f"Batch '{batch_data.get('product_name')}' and all its samples approved successfully.")
+                self.load_batches()  # Refresh the main batches tree
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to approve batch and samples: {e}")
+
+    def admin_reject_selected_batch(self):
+        """Rejects the selected batch and all its associated samples."""
+        selected = self.batches_tree.selection()
+        if not selected:
+            messagebox.showinfo("Info", "Please select a batch to reject.")
+            return
+
+        batch_doc_id = selected[0]
+        batch_doc = db.collection("batches").document(batch_doc_id).get()
+
+        if not batch_doc.exists:
+            messagebox.showerror("Error", "Selected batch not found.")
+            return
+
+        batch_data = batch_doc.to_dict()
+        if batch_data.get("status") == "rejected":
+            messagebox.showinfo("Info", "Batch is already rejected.")
+            return
+
+        confirm = messagebox.askyesno("Confirm Batch Rejection",
+                                      f"Are you sure you want to reject batch '{batch_data.get('product_name')}' (ID: {batch_data.get('batch_id')}) and all its samples?")
+        if confirm:
+            try:
+                # Update batch status to rejected
+                db.collection("batches").document(batch_doc_id).update({"status": "rejected"})
+
+                # Also reject all samples associated with this batch
+                associated_samples = db.collection("samples").where("batch_id", "==", batch_doc_id).stream()
+                for sample in associated_samples:
+                    sample.reference.update({"status": "rejected"})
+
+                messagebox.showinfo("Success",
+                                    f"Batch '{batch_data.get('product_name')}' and all its samples rejected successfully.")
+                self.load_batches()  # Refresh the main batches tree
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to reject batch and samples: {e}")
+
     def admin_view_samples_for_batch(self):
         """Opens a new window to display samples associated with the selected batch."""
         selected = self.batches_tree.selection()
@@ -256,6 +335,8 @@ class AdminLogic:
         # New "Approve Sample" button
         ttk.Button(btn_sample_frame, text="Approve Sample",
                    command=lambda: self.admin_approve_sample(samples_tree, batch_doc_id)).pack(side="left", padx=5)
+        ttk.Button(btn_sample_frame, text="Reject Sample",  # New button
+                   command=lambda: self.admin_reject_sample(samples_tree, batch_doc_id)).pack(side="left", padx=5)
 
         self._load_samples_into_tree(batch_id_from_doc, samples_tree)  # Initial load using the actual batch_id
 
@@ -337,6 +418,50 @@ class AdminLogic:
 
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to approve sample or update batch status: {e}")
+
+    def admin_reject_sample(self, samples_tree_ref, batch_doc_id):
+        """Rejects a selected sample and updates the parent batch status if necessary."""
+        selected_sample_iid = samples_tree_ref.selection()
+        if not selected_sample_iid:
+            messagebox.showinfo("Info", "Please select a sample to reject.")
+            return
+
+        sample_tree_data = samples_tree_ref.item(selected_sample_iid[0], 'values')
+        sample_id_from_tree = sample_tree_data[0]
+
+        sample_query = db.collection("samples").where("sample_id", "==", sample_id_from_tree).where("batch_id", "==",
+                                                                                                    batch_doc_id).limit(
+            1).get()
+
+        if not sample_query:
+            messagebox.showerror("Error", "Selected sample not found in database.")
+            return
+
+        sample_doc_ref = sample_query[0].reference
+        sample_doc = sample_query[0].to_dict()
+
+        if sample_doc.get("status") == "rejected":
+            messagebox.showinfo("Info", "Sample is already rejected.")
+            return
+
+        confirm = messagebox.askyesno("Confirm Reject Sample",
+                                      f"Reject sample '{sample_doc.get('sample_id')}'?")
+        if confirm:
+            try:
+                sample_doc_ref.update({"status": "rejected"})
+                messagebox.showinfo("Success", f"Sample '{sample_doc.get('sample_id')}' rejected successfully.")
+                self._load_samples_into_tree(batch_doc_id, samples_tree_ref)
+
+                # If a sample is rejected, the batch status should definitely revert to "pending approval"
+                batch_ref = db.collection("batches").document(batch_doc_id)
+                current_batch_status = batch_ref.get().to_dict().get("status")
+                if current_batch_status != "pending approval":
+                    batch_ref.update({"status": "pending approval"})
+                    messagebox.showinfo("Batch Status Update",
+                                        f"Batch '{batch_doc_id}' status updated to 'pending approval' as a sample was rejected.")
+                    self.load_batches()
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to reject sample or update batch status: {e}")
 
     def _load_samples_into_tree(self, batch_id, samples_tree):
         """Helper method to load samples into the provided treeview."""
