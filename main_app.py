@@ -8,7 +8,8 @@ from auth_manager import AuthManager
 from user_logic import UserLogic
 from admin_logic import AdminLogic
 from tester_logic import TesterLogic
-from constants import MIN_PASSWORD_LENGTH # Just for style mapping, not direct use in logic here
+from constants import MIN_PASSWORD_LENGTH  # Just for style mapping, not direct use in logic here
+
 
 class ShelfLifeApp:
     def __init__(self, root):
@@ -16,10 +17,10 @@ class ShelfLifeApp:
         self.root.title("Shelf-life Study Management System")
         self.root.geometry("800x600")
 
-        self.data = None # This will hold the DataFrame, managed by UserLogic
-        self.file_path = "" # Managed by UserLogic
+        self.data = None  # This will hold the DataFrame, managed by UserLogic
+        self.file_path = ""  # Managed by UserLogic
 
-        self.current_user = None # Stores authenticated user's data
+        self.current_user = None  # Stores authenticated user's data
 
         # Initialize the logic modules, passing self (the main app instance) for callbacks
         self.auth_manager = AuthManager(self.root, self)
@@ -48,7 +49,7 @@ class ShelfLifeApp:
 
     def test_dashboard(self):
         self.tester_logic.tester_dashboard()
-        
+
     def logout(self):
         """Logs out the current user and returns to the login screen."""
         confirm = messagebox.askyesno("Logout", "Are you sure you want to logout?")
@@ -56,15 +57,16 @@ class ShelfLifeApp:
             self.current_user = None
             self.login_screen()
 
+
 if __name__ == "__main__":
     root = tk.Tk()
-    
+
     # Apply a modern theme
     style = ttk.Style(root)
-    style.theme_use('clam') # 'clam', 'alt', 'default', 'classic'
+    style.theme_use('clam')  # 'clam', 'alt', 'default', 'classic'
     # Define an accent button style
     style.configure('Accent.TButton', background='#4CAF50', foreground='white', font=('Helvetica', 10, 'bold'))
-    style.map('Accent.TButton', 
+    style.map('Accent.TButton',
               background=[('active', '#45a049'), ('pressed', '#367c39')],
               foreground=[('active', 'white'), ('pressed', 'white')])
 
