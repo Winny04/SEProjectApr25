@@ -456,23 +456,26 @@ class UserLogic:
                 
                 if aggregate_query_snapshot:
                     try:
-                        # Try the direct access first (expected for current firebase-admin versions)
-                        total_count = aggregate_query_snapshot[0].value
-                    except AttributeError:
-                        # If .value is not found, it might be due to nesting as observed in logs
-                        if isinstance(aggregate_query_snapshot[0], list) and len(aggregate_query_snapshot[0]) > 0:
-                            # Attempt to access the value from the first item of the nested list
-                            nested_item = aggregate_query_snapshot[0][0]
-                            if hasattr(nested_item, 'value'):
-                                total_count = nested_item.value
-                            else:
-                                logging.error(f"Nested item in aggregate_query_snapshot[0] does not have 'value' attribute: {type(nested_item)}")
-                                total_count = 0
+                        # Attempt to retrieve the value from the first element of the snapshot.
+                        # This covers the standard case where aggregate.get() returns [AggregateResult(...)]
+                        potential_result_object = aggregate_query_snapshot[0]
+                        
+                        # Handle cases where the AggregateResult might be nested further,
+                        # which the traceback suggests might be happening.
+                        if isinstance(potential_result_object, list) and len(potential_result_object) > 0:
+                            potential_result_object = potential_result_object[0]
+
+                        if hasattr(potential_result_object, 'value'):
+                            total_count = potential_result_object.value
+                        elif isinstance(potential_result_object, dict) and 'count' in potential_result_object:
+                            # Fallback for dict-like objects that might represent the count
+                            total_count = potential_result_object.get('count', 0)
                         else:
-                            logging.error(f"AggregateResult object at index 0 does not have 'value' attribute (and not nested list): {type(aggregate_query_snapshot[0])}", exc_info=True)
-                            total_count = 0
+                            logging.error(f"Unexpected structure for aggregate result object (all_samples): {type(potential_result_object)}")
+                            total_count = 0 # Default to 0 if structure is truly unknown
+
                     except IndexError:
-                        logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds.")
+                        logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds (all_samples).")
                         total_count = 0
                     except Exception as unexpected_e:
                         logging.error(f"Unexpected error when getting total count for all samples: {unexpected_e}", exc_info=True)
@@ -495,23 +498,21 @@ class UserLogic:
                 
                 if aggregate_query_snapshot:
                     try:
-                        # Try the direct access first (expected for current firebase-admin versions)
-                        total_count = aggregate_query_snapshot[0].value
-                    except AttributeError:
-                        # If .value is not found, it might be due to nesting as observed in logs
-                        if isinstance(aggregate_query_snapshot[0], list) and len(aggregate_query_snapshot[0]) > 0:
-                            # Attempt to access the value from the first item of the nested list
-                            nested_item = aggregate_query_snapshot[0][0]
-                            if hasattr(nested_item, 'value'):
-                                total_count = nested_item.value
-                            else:
-                                logging.error(f"Nested item in aggregate_query_snapshot[0] does not have 'value' attribute: {type(nested_item)}")
-                                total_count = 0
+                        potential_result_object = aggregate_query_snapshot[0]
+
+                        if isinstance(potential_result_object, list) and len(potential_result_object) > 0:
+                            potential_result_object = potential_result_object[0]
+
+                        if hasattr(potential_result_object, 'value'):
+                            total_count = potential_result_object.value
+                        elif isinstance(potential_result_object, dict) and 'count' in potential_result_object:
+                            total_count = potential_result_object.get('count', 0)
                         else:
-                            logging.error(f"AggregateResult object at index 0 does not have 'value' attribute (and not nested list): {type(aggregate_query_snapshot[0])}", exc_info=True)
-                            total_count = 0
+                            logging.error(f"Unexpected structure for aggregate result object (my_samples): {type(potential_result_object)}")
+                            total_count = 0 # Default to 0 if structure is truly unknown
+
                     except IndexError:
-                        logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds.")
+                        logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds (my_samples).")
                         total_count = 0
                     except Exception as unexpected_e:
                         logging.error(f"Unexpected error when getting total count for my samples: {unexpected_e}", exc_info=True)
@@ -1653,20 +1654,21 @@ class UserLogic:
             samples_ref = db.collection("samples")
             query = samples_ref
 
-            firestore_query_applied = False # Flag to track if a date range query was applied on Firestore
+            firestore_maturation_date_filter_applied = False # Flag for maturation date filter applied on Firestore
+            firestore_creation_date_filter_applied = False   # Flag for creation date filter applied on Firestore
 
             if filters:
                 # Prioritize maturation_date for Firestore range query if both date filters enabled
                 if 'start_date' in filters and 'end_date' in filters:
                     query = query.where("maturation_date", ">=", filters['start_date'])
                     query = query.where("maturation_date", "<=", filters['end_date'])
-                    firestore_query_applied = True
+                    firestore_maturation_date_filter_applied = True
                     logging.info("Applied Firestore maturation_date range filter.")
                 # If maturation_date not used, try creation_date for Firestore range query
                 elif 'creation_start_date' in filters and 'creation_end_date' in filters:
                     query = query.where("creation_date", ">=", filters['creation_start_date'])
                     query = query.where("creation_date", "<=", filters['creation_end_date'])
-                    firestore_query_applied = True
+                    firestore_creation_date_filter_applied = True
                     logging.info("Applied Firestore creation_date range filter.")
                 
             samples = query.stream()
@@ -1718,28 +1720,18 @@ class UserLogic:
                 # Apply secondary date filters locally if a Firestore range query was already applied for another date
                 # This ensures that if maturation date was used for the Firestore query, creation date can still be filtered locally.
                 # And vice-versa.
-                if firestore_query_applied: # If a date filter was pushed to Firestore
-                    if 'start_date' in filters and 'end_date' in filters and not ('maturation_date' in [f.field_path for f in query._field_filters]): # Check if mat date was NOT the Firestore filter
-                        df = df[df['MaturationDate'].apply(lambda x: x and filters['start_date'] <= x)]
-                        df = df[df['MaturationDate'].apply(lambda x: x and x <= filters['end_date'])]
-                        logging.debug(f"Applied local maturation_date filter, {len(df)} remaining.")
-                    
-                    if 'creation_start_date' in filters and 'creation_end_date' in filters and not ('creation_date' in [f.field_path for f in query._field_filters]): # Check if creation date was NOT the Firestore filter
-                        df = df[df['CreationDate'].apply(lambda x: x and filters['creation_start_date'] <= x)]
-                        df = df[df['CreationDate'].apply(lambda x: x and x <= filters['creation_end_date'])]
-                        logging.debug(f"Applied local creation_date filter, {len(df)} remaining.")
                 
-                # If no Firestore query was applied for date, and date filters are enabled, apply locally
-                if not firestore_query_applied:
-                    if 'start_date' in filters and 'end_date' in filters:
-                        df = df[df['MaturationDate'].apply(lambda x: x and filters['start_date'] <= x)]
-                        df = df[df['MaturationDate'].apply(lambda x: x and x <= filters['end_date'])]
-                        logging.debug(f"Applied local maturation_date filter (no Firestore date filter), {len(df)} remaining.")
-                    if 'creation_start_date' in filters and 'creation_end_date' in filters:
-                        df = df[df['CreationDate'].apply(lambda x: x and filters['creation_start_date'] <= x)]
-                        df = df[df['CreationDate'].apply(lambda x: x and x <= filters['creation_end_date'])]
-                        logging.debug(f"Applied local creation_date filter (no Firestore date filter), {len(df)} remaining.")
-
+                # If maturation date filter was enabled and NOT applied in Firestore, apply locally
+                if 'start_date' in filters and 'end_date' in filters and not firestore_maturation_date_filter_applied:
+                    df = df[df['MaturationDate'].apply(lambda x: x and filters['start_date'] <= x)]
+                    df = df[df['MaturationDate'].apply(lambda x: x and x <= filters['end_date'])]
+                    logging.debug(f"Applied local maturation_date filter, {len(df)} remaining.")
+                
+                # If creation date filter was enabled and NOT applied in Firestore, apply locally
+                if 'creation_start_date' in filters and 'creation_end_date' in filters and not firestore_creation_date_filter_applied:
+                    df = df[df['CreationDate'].apply(lambda x: x and filters['creation_start_date'] <= x)]
+                    df = df[df['CreationDate'].apply(lambda x: x and x <= filters['creation_end_date'])]
+                    logging.debug(f"Applied local creation_date filter, {len(df)} remaining.")
 
             self.load_samples_to_treeview(df.to_dict('records')) # Use the refactored function
             
