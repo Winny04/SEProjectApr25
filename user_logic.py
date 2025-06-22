@@ -25,6 +25,61 @@ class UserLogic:
         self.excel_imported = False
         self.current_selected_batch_id = None
 
+        # Initialize ttk Style
+        self.style = ttk.Style()
+        # Set a modern theme, e.g., 'clam', 'alt', 'vista', 'xpnative'
+        self.style.theme_use('clam') 
+
+        # Configure general styles
+        self.style.configure('TFrame', background='#f0f0f0')
+        self.style.configure('TLabel', font=('Helvetica', 10), background='#f0f0f0', foreground='#333333')
+        
+        # Configure different button styles
+        # Primary button (e.g., for major actions like Select Batch, Add Sample)
+        self.style.configure('Primary.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#007bff', foreground='white', relief='raised')
+        self.style.map('Primary.TButton', background=[('active', '#0056b3')]) # Darken on hover
+
+        self.style.configure('add.TButton', font=('Helvetica', 10, 'bold'), padding=8, background="#94e119", foreground='white', relief='raised')
+        self.style.map('add.TButton', background=[('active', "#0ee969")])
+
+        # Secondary button (e.g., for less critical actions like Refresh, Check Notifications)
+        self.style.configure('Secondary.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#6c757d', foreground='white', relief='raised')
+        self.style.map('Secondary.TButton', background=[('active', '#545b62')])
+
+        # Success button (e.g., for actions that add or confirm)
+        self.style.configure('Success.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#28a745', foreground='white', relief='raised')
+        self.style.map('Success.TButton', background=[('active', '#218838')])
+
+        # Warning/Info button (e.g., for filters, generate barcode)
+        self.style.configure('Info.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#17a2b8', foreground='white', relief='raised')
+        self.style.map('Info.TButton', background=[('active', '#138496')])
+
+        # Danger button (e.g., for delete actions)
+        self.style.configure('Danger.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#dc3545', foreground='white', relief='raised')
+        self.style.map('Danger.TButton', background=[('active', '#c82333')])
+
+        # Configure Entry and Combobox styles
+        self.style.configure('TEntry', padding=5)
+        self.style.configure('TCombobox', padding=5)
+        self.style.configure('TCheckbutton', background='#f0f0f0')
+        self.style.configure('TRadiobutton', background='#f0f0f0')
+
+        # Configure Treeview style
+        self.style.configure('Treeview',
+            font=('Helvetica', 9),
+            rowheight=25,
+            fieldbackground='#ffffff',
+            background='#ffffff',
+            foreground='#000000',
+            bordercolor='#cccccc',
+            lightcolor='#eeeeee',
+            darkcolor='#bbbbbb'
+        )
+        self.style.map('Treeview', background=[('selected', '#347083')]) # Blue selection
+        self.style.configure('Treeview.Heading', font=('Helvetica', 10, 'bold'), background='#e0e0e0', foreground='#333333')
+        self.style.map('Treeview.Heading', background=[('active', '#d0d0d0')])
+
+
         # Elements for forms (will be created dynamically)
         self.existing_batch_combobox = None
         self.new_batch_product_name = None
@@ -79,7 +134,9 @@ class UserLogic:
         """Displays the user dashboard with sample management features."""
         logging.info("Entering user_dashboard method.")
         self.app.clear_root()
-        self.root.geometry("1000x600")
+        # Set root background color
+        self.root.config(bg='#f0f0f0') 
+        self.root.geometry("1300x600")
         self.excel_imported = False
         self.current_selected_batch_id = None
         
@@ -109,29 +166,32 @@ class UserLogic:
         self.root.config(menu=menubar)
 
         # === Top Toolbar Frame for Buttons ===
-        toolbar_top = tk.Frame(self.root, pady=10)
-        toolbar_top.pack(fill="x", padx=10)
+        # Using 'Toolbar.TFrame' style for consistency
+        toolbar_top = ttk.Frame(self.root, padding=(10, 10), style='TFrame')
+        toolbar_top.pack(fill="x", padx=10, pady=(10, 0)) # Add some top padding
 
-        ttk.Button(toolbar_top, text="Logout", command=self.app.logout).pack(side=tk.RIGHT, padx=5)
-        ttk.Button(toolbar_top, text="Refresh", command=self.refresh_tree).pack(side=tk.RIGHT, padx=5)
-        ttk.Button(toolbar_top, text="Load Today's Batches", command=self.load_todays_batches_to_tree).pack(side=tk.LEFT, padx=5)
-        ttk.Button(toolbar_top, text="Check Notifications", command=self.check_notifications).pack(side=tk.LEFT, padx=5)
-        self.add_sample_main_button = ttk.Button(toolbar_top, text="Select Batch", command=self.open_batch_selection_screen)
+        # Use different button styles
+        ttk.Button(toolbar_top, text="Logout", command=self.app.logout, style='Secondary.TButton').pack(side=tk.RIGHT, padx=5)
+        ttk.Button(toolbar_top, text="Refresh", command=self.refresh_tree, style='Secondary.TButton').pack(side=tk.RIGHT, padx=5)
+        ttk.Button(toolbar_top, text="Load Today's Batches", command=self.load_todays_batches_to_tree, style='Secondary.TButton').pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_top, text="Check Notifications", command=self.check_notifications, style='Info.TButton').pack(side=tk.LEFT, padx=5)
+        self.add_sample_main_button = ttk.Button(toolbar_top, text="Select Batch", command=self.open_batch_selection_screen, style='Primary.TButton')
         self.add_sample_main_button.pack(side=tk.LEFT, padx=5)
-        self.add_single_sample_button = ttk.Button(toolbar_top, text="Add Single Sample to Current Batch", command=self.open_single_sample_form, state=tk.DISABLED)
+        self.add_single_sample_button = ttk.Button(toolbar_top, text="Add Sample to Current Batch", command=self.open_single_sample_form, state=tk.DISABLED, style='add.TButton')
         self.add_single_sample_button.pack(side=tk.LEFT, padx=5)
         
-        self.edit_sample_button = ttk.Button(toolbar_top, text="Edit Sample", command=self.edit_sample)
+        self.edit_sample_button = ttk.Button(toolbar_top, text="Edit Sample", command=self.edit_sample, style='Info.TButton')
         self.edit_sample_button.pack(side=tk.LEFT, padx=5)
-        self.delete_sample_button = ttk.Button(toolbar_top, text="Delete Sample", command=self.delete_sample)
+        self.delete_sample_button = ttk.Button(toolbar_top, text="Delete Sample", command=self.delete_sample, style='Danger.TButton')
         self.delete_sample_button.pack(side=tk.LEFT, padx=5)
 
 
         # === Treeview Frame for Data Display with Scrollbar ===
-        tree_frame = ttk.Frame(self.root)
+        tree_frame = ttk.Frame(self.root, style='TFrame', relief='sunken', borderwidth=1) # Added relief and border
         tree_frame.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
 
-        self.tree = ttk.Treeview(tree_frame, columns=["DocID", "DisplaySampleID", "Owner", "MaturationDate", "Status", "BatchID", "CreationDate", "ProductName", "Description", "SubmissionDate", "NumberOfSamples"], show='headings')
+        # Treeview configured with style 'Treeview'
+        self.tree = ttk.Treeview(tree_frame, columns=["DocID", "DisplaySampleID", "Owner", "MaturationDate", "Status", "BatchID", "CreationDate", "ProductName", "Description", "SubmissionDate", "NumberOfSamples"], show='headings', style='Treeview')
 
         tree_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=tree_scrollbar.set)
@@ -175,28 +235,29 @@ class UserLogic:
         self.tree.bind("<Double-1>", self._on_tree_double_click)
 
         # === Status Bar ===
-        self.status_label = tk.Label(self.root, text="Load samples from DB or import Excel.", anchor='w', bd=1, relief=tk.SUNKEN)
-        self.status_label.pack(fill=tk.X, padx=10, pady=5)
+        self.status_label = ttk.Label(self.root, text="Load samples from DB or import Excel.", anchor='w', 
+                                     font=('Helvetica', 9), background='#e0e0e0', foreground='#333333', relief=tk.SUNKEN, borderwidth=1)
+        self.status_label.pack(fill=tk.X, padx=10, pady=(5, 10)) # Add some bottom padding
 
         # === Bottom Toolbar Frame for Generate Barcode, Pagination, and Filter Button ===
-        bottom_toolbar = tk.Frame(self.root, pady=10)
-        bottom_toolbar.pack(fill="x", padx=10, side=tk.BOTTOM)
+        bottom_toolbar = ttk.Frame(self.root, padding=(10, 5), style='TFrame')
+        bottom_toolbar.pack(fill="x", padx=10, pady=(0, 10), side=tk.BOTTOM)
         
-        ttk.Button(bottom_toolbar, text="Generate Barcode", command=self.generate_barcode).pack(side=tk.LEFT, padx=5)
+        ttk.Button(bottom_toolbar, text="Generate Barcode", command=self.generate_barcode, style='Info.TButton').pack(side=tk.LEFT, padx=5)
 
-        pagination_frame = ttk.Frame(bottom_toolbar)
+        pagination_frame = ttk.Frame(bottom_toolbar, style='TFrame')
         pagination_frame.pack(side=tk.LEFT, expand=True)
 
-        self.prev_sample_page_btn = ttk.Button(pagination_frame, text="Previous", command=lambda: self.navigate_samples_page('prev'), state=tk.DISABLED)
+        self.prev_sample_page_btn = ttk.Button(pagination_frame, text="Previous", command=lambda: self.navigate_samples_page('prev'), state=tk.DISABLED, style='Secondary.TButton')
         self.prev_sample_page_btn.pack(side=tk.LEFT, padx=2)
 
-        self.page_info_label = ttk.Label(pagination_frame, text="Page 1 of 1")
+        self.page_info_label = ttk.Label(pagination_frame, text="Page 1 of 1", style='TLabel')
         self.page_info_label.pack(side=tk.LEFT, padx=5)
 
-        self.next_sample_page_btn = ttk.Button(pagination_frame, text="Next", command=lambda: self.navigate_samples_page('next'), state=tk.DISABLED)
+        self.next_sample_page_btn = ttk.Button(pagination_frame, text="Next", command=lambda: self.navigate_samples_page('next'), state=tk.DISABLED, style='Secondary.TButton')
         self.next_sample_page_btn.pack(side=tk.LEFT, padx=2)
         
-        ttk.Button(bottom_toolbar, text="Filter Samples/Find Batch", command=self.open_filter_form).pack(side=tk.RIGHT, padx=5)
+        ttk.Button(bottom_toolbar, text="Filter Samples/Find Batch", command=self.open_filter_form, style='Info.TButton').pack(side=tk.RIGHT, padx=5)
 
         self.load_samples_paginated(query_type='all_samples', reset=True)
         logging.info("User dashboard loaded.")
@@ -507,40 +568,39 @@ class UserLogic:
             
             # Determine total count for page info
             total_count = 0
-            if query_type == 'all_samples':
-                aggregate_query = db.collection("samples").count()
-                aggregate_query_snapshot = aggregate_query.get()
-                
-                if aggregate_query_snapshot:
-                    try:
-                        potential_result_object = aggregate_query_snapshot[0]
-                        if isinstance(potential_result_object, list) and len(potential_result_object) > 0:
-                            potential_result_object = potential_result_object[0]
-                        if hasattr(potential_result_object, 'value'):
-                            total_count = potential_result_object.value
-                        elif isinstance(potential_result_object, dict) and 'count' in potential_result_object:
-                            total_count = potential_result_object.get('count', 0)
-                        else:
-                            logging.error(f"Unexpected structure for aggregate result object (all_samples): {type(potential_result_object)}")
-                            total_count = 0
-                    except IndexError:
-                        logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds (all_samples).")
+            aggregate_query = db.collection("samples").count()
+            aggregate_query_snapshot = aggregate_query.get()
+            
+            if aggregate_query_snapshot:
+                try:
+                    potential_result_object = aggregate_query_snapshot[0]
+                    if isinstance(potential_result_object, list) and len(potential_result_object) > 0:
+                        potential_result_object = potential_result_object[0]
+                    if hasattr(potential_result_object, 'value'):
+                        total_count = potential_result_object.value
+                    elif isinstance(potential_result_object, dict) and 'count' in potential_result_object:
+                        total_count = potential_result_object.get('count', 0)
+                    else:
+                        logging.error(f"Unexpected structure for aggregate result object (all_samples): {type(potential_result_object)}")
                         total_count = 0
-                    except Exception as unexpected_e:
-                        logging.error(f"Unexpected error when getting total count for all samples: {unexpected_e}", exc_info=True)
-                        total_count = 0
-                else:
+                except IndexError:
+                    logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds (all_samples).")
                     total_count = 0
-                logging.info(f"Total count for all samples: {total_count}")
-                
-                # Store cursor for the next page if a full page was fetched
-                if docs and len(docs) == self.samples_per_page:
-                    if len(self.all_samples_page_cursors) == self.current_page_index:
-                        self.all_samples_page_cursors.append(docs[-1])
-                    else: 
-                        self.all_samples_page_cursors[self.current_page_index] = docs[-1]
-                elif not docs and self.current_page_index > 0:
-                    logging.info("Reached end of 'all_samples' data during pagination.")
+                except Exception as unexpected_e:
+                    logging.error(f"Unexpected error when getting total count for all samples: {unexpected_e}", exc_info=True)
+                    total_count = 0
+            else:
+                total_count = 0
+            logging.info(f"Total count for all samples: {total_count}")
+            
+            # Store cursor for the next page if a full page was fetched
+            if docs and len(docs) == self.samples_per_page:
+                if len(self.all_samples_page_cursors) == self.current_page_index:
+                    self.all_samples_page_cursors.append(docs[-1])
+                else: 
+                    self.all_samples_page_cursors[self.current_page_index] = docs[-1]
+            elif not docs and self.current_page_index > 0:
+                logging.info("Reached end of 'all_samples' data during pagination.")
 
             elif query_type == 'my_samples':
                 aggregate_query = db.collection("samples").where("submitted_by_employee_id", "==", self.app.current_user['employee_id']).count()
@@ -703,41 +763,42 @@ class UserLogic:
         import_options_form.geometry("480x400")
         import_options_form.grab_set()
         import_options_form.transient(self.root)
+        import_options_form.config(bg='#f0f0f0') # Set background
 
-        frame = ttk.Frame(import_options_form, padding=15)
+        frame = ttk.Frame(import_options_form, padding=15, style='TFrame')
         frame.pack(expand=True, fill="both")
 
         self.excel_import_choice = tk.StringVar(value="local") # Default to local import
         
         # Radio buttons for import choices
         ttk.Radiobutton(frame, text="Import to Local Table (temporary)",
-                        variable=self.excel_import_choice, value="local",
+                        variable=self.excel_import_choice, value="local", style='TRadiobutton',
                         command=self._toggle_excel_import_fields).grid(row=0, column=0, columnspan=2, sticky="w", pady=5)
         
         ttk.Radiobutton(frame, text="Add to New Batch in Database",
-                        variable=self.excel_import_choice, value="new_batch",
+                        variable=self.excel_import_choice, value="new_batch", style='TRadiobutton',
                         command=self._toggle_excel_import_fields).grid(row=1, column=0, columnspan=2, sticky="w", pady=5)
         
-        ttk.Label(frame, text="  New Product Name:").grid(row=2, column=0, sticky="e", pady=2, padx=5)
-        self.excel_new_batch_product_name_entry = ttk.Entry(frame, width=35, state="disabled")
+        ttk.Label(frame, text="  New Product Name:", style='TLabel').grid(row=2, column=0, sticky="e", pady=2, padx=5)
+        self.excel_new_batch_product_name_entry = ttk.Entry(frame, width=35, state="disabled", style='TEntry')
         self.excel_new_batch_product_name_entry.grid(row=2, column=1, sticky="ew", pady=2, padx=5)
 
-        ttk.Label(frame, text="  New Description:").grid(row=3, column=0, sticky="e", pady=2, padx=5)
-        self.excel_new_batch_description_entry = ttk.Entry(frame, width=35, state="disabled")
+        ttk.Label(frame, text="  New Description:", style='TLabel').grid(row=3, column=0, sticky="e", pady=2, padx=5)
+        self.excel_new_batch_description_entry = ttk.Entry(frame, width=35, state="disabled", style='TEntry')
         self.excel_new_batch_description_entry.grid(row=3, column=1, sticky="ew", pady=2, padx=5)
 
         ttk.Radiobutton(frame, text="Add to Existing Batch in Database",
-                        variable=self.excel_import_choice, value="existing_batch",
+                        variable=self.excel_import_choice, value="existing_batch", style='TRadiobutton',
                         command=self._toggle_excel_import_fields).grid(row=4, column=0, columnspan=2, sticky="w", pady=5)
         
-        ttk.Label(frame, text="  Existing Batch ID:").grid(row=5, column=0, sticky="e", pady=2, padx=5)
-        self.excel_existing_batch_combobox = ttk.Combobox(frame, state="disabled", width=32)
+        ttk.Label(frame, text="  Existing Batch ID:", style='TLabel').grid(row=5, column=0, sticky="e", pady=2, padx=5)
+        self.excel_existing_batch_combobox = ttk.Combobox(frame, state="disabled", width=32, style='TCombobox')
         self.excel_existing_batch_combobox.grid(row=5, column=1, sticky="ew", pady=2, padx=5)
         self._load_existing_batches_into_combobox_for_excel_import(self.excel_existing_batch_combobox)
 
 
         ttk.Button(frame, text="Select Excel File and Proceed", 
-                   command=lambda: self._handle_excel_import_choice(import_options_form)).grid(row=6, column=0, columnspan=2, pady=20)
+                   command=lambda: self._handle_excel_import_choice(import_options_form), style='Primary.TButton').grid(row=6, column=0, columnspan=2, pady=20)
         
         self._toggle_excel_import_fields() # Set initial state of fields based on default radio button
 
@@ -1227,28 +1288,29 @@ class UserLogic:
         batch_selection_form.geometry("450x320")
         batch_selection_form.grab_set()
         batch_selection_form.transient(self.root)
+        batch_selection_form.config(bg='#f0f0f0') # Set background
 
-        frame = ttk.Frame(batch_selection_form, padding=10)
+        frame = ttk.Frame(batch_selection_form, padding=10, style='TFrame')
         frame.pack(expand=True, fill="both")
 
         self.batch_choice = tk.StringVar(value="existing")
-        radio_existing = ttk.Radiobutton(frame, text="Select Existing Batch", variable=self.batch_choice, value="existing")
-        radio_new = ttk.Radiobutton(frame, text="Create New Batch", variable=self.batch_choice, value="new")
+        radio_existing = ttk.Radiobutton(frame, text="Select Existing Batch", variable=self.batch_choice, value="existing", style='TRadiobutton')
+        radio_new = ttk.Radiobutton(frame, text="Create New Batch", variable=self.batch_choice, value="new", style='TRadiobutton')
 
         radio_existing.grid(row=0, column=0, columnspan=2, sticky="w", pady=5)
         radio_new.grid(row=1, column=0, columnspan=2, sticky="w", pady=5)
 
-        ttk.Label(frame, text="Existing Batch ID:").grid(row=2, column=0, sticky="e", pady=5, padx=5)
-        self.existing_batch_combobox = ttk.Combobox(frame, state="readonly", width=30)
+        ttk.Label(frame, text="Existing Batch ID:", style='TLabel').grid(row=2, column=0, sticky="e", pady=5, padx=5)
+        self.existing_batch_combobox = ttk.Combobox(frame, state="readonly", width=30, style='TCombobox')
         self.existing_batch_combobox.grid(row=2, column=1, sticky="ew", pady=5, padx=5)
         self._load_existing_batches_into_combobox()
 
-        ttk.Label(frame, text="New Product Name:").grid(row=3, column=0, sticky="e", pady=5, padx=5)
-        self.new_batch_product_name = ttk.Entry(frame, width=30, state="disabled")
+        ttk.Label(frame, text="New Product Name:", style='TLabel').grid(row=3, column=0, sticky="e", pady=5, padx=5)
+        self.new_batch_product_name = ttk.Entry(frame, width=30, state="disabled", style='TEntry')
         self.new_batch_product_name.grid(row=3, column=1, sticky="ew", pady=5, padx=5)
 
-        ttk.Label(frame, text="New Description:").grid(row=4, column=0, sticky="e", pady=5, padx=5)
-        self.new_batch_description = ttk.Entry(frame, width=30, state="disabled")
+        ttk.Label(frame, text="New Description:", style='TLabel').grid(row=4, column=0, sticky="e", pady=5, padx=5)
+        self.new_batch_description = ttk.Entry(frame, width=30, state="disabled", style='TEntry')
         self.new_batch_description.grid(row=4, column=1, sticky="ew", pady=5, padx=5)
 
         # Configure commands for radio buttons to toggle fields
@@ -1258,7 +1320,7 @@ class UserLogic:
         # Set initial state of fields based on default radio button
         self._toggle_batch_fields_on_selection(True)
 
-        ttk.Button(frame, text="Confirm Batch Selection", command=lambda: self._handle_batch_selection_confirmation(batch_selection_form)).grid(row=5, column=0, columnspan=2, pady=20)
+        ttk.Button(frame, text="Confirm Batch Selection", command=lambda: self._handle_batch_selection_confirmation(batch_selection_form), style='Primary.TButton').grid(row=5, column=0, columnspan=2, pady=20)
         batch_selection_form.protocol("WM_DELETE_WINDOW", batch_selection_form.destroy)
         logging.info("Batch selection screen opened.")
 
@@ -1327,7 +1389,7 @@ class UserLogic:
                 return
 
             # Generate a unique batch ID
-            selected_batch_id = f"batch_{self.app.current_user['employee_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+            selected_batch_id = f"batch_{self.app.current_user['employee_id']}_{datetime.now().strftime('%Y%m%d')}"
             
             # Check if generated ID already exists (collision is unlikely with timestamp but good practice)
             if db.collection("batches").document(selected_batch_id).get().exists:
@@ -1512,26 +1574,27 @@ class UserLogic:
 
         form = tk.Toplevel(self.root)
         form.title(f"Add Sample to Batch: {self.current_selected_batch_id}")
-        form.geometry("400x350")
+        form.geometry("500x350")
         form.grab_set()
         form.transient(self.root)
+        form.config(bg='#f0f0f0') # Set background
 
-        frame = ttk.Frame(form, padding=10)
+        frame = ttk.Frame(form, padding=10, style='TFrame')
         frame.pack(expand=True, fill="both")
 
         current_row = 0
 
-        ttk.Label(frame, text="Batch ID:").grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
-        ttk.Label(frame, text=self.current_selected_batch_id, font=("Helvetica", 10, "bold")).grid(row=current_row, column=1, sticky="w", pady=5, padx=5)
+        ttk.Label(frame, text="Batch ID:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(frame, text=self.current_selected_batch_id, font=('Helvetica', 10, 'bold'), background='#f0f0f0', foreground='#333333').grid(row=current_row, column=1, sticky="w", pady=5, padx=5)
         current_row += 1
 
-        ttk.Label(frame, text="Sample ID (e.g., SMPL-001):").grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
-        self.entry_sample_display_id = ttk.Entry(frame, width=30)
+        ttk.Label(frame, text="Sample ID (e.g., SMPL-001):", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        self.entry_sample_display_id = ttk.Entry(frame, width=30, style='TEntry')
         self.entry_sample_display_id.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         current_row += 1
 
-        ttk.Label(frame, text="Sample Owner:").grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
-        self.entry_owner_combobox = ttk.Combobox(frame, state="readonly", width=27)
+        ttk.Label(frame, text="Sample Owner:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        self.entry_owner_combobox = ttk.Combobox(frame, state="readonly", width=27, style='TCombobox')
         self.entry_owner_combobox.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         self._load_users_into_owner_combobox(self.entry_owner_combobox)
         # Set default owner to current user if available
@@ -1539,20 +1602,20 @@ class UserLogic:
             self.entry_owner_combobox.set(self.app.current_user['username'])
         current_row += 1
 
-        ttk.Label(frame, text="Maturation Date (YYYY-MM-DD):").grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(frame, text="Maturation Date (YYYY-MM-DD):", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
         self.entry_maturation_date_entry = DateEntry(frame, width=28, background='darkblue', foreground='white', borderwidth=2,
-                                                     date_pattern='yyyy-mm-dd')
+                                                     date_pattern='yyyy-mm-dd') # TkCalendar styling
         self.entry_maturation_date_entry.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         self.entry_maturation_date_entry.set_date(datetime.now().date()) # Default to today
         current_row += 1
 
-        ttk.Label(frame, text="Status:").grid(row=current_row, column=0, padx=5, pady=5, sticky="e")
-        self.status_combobox = ttk.Combobox(frame, values=SAMPLE_STATUS_OPTIONS, state="readonly", width=27)
+        ttk.Label(frame, text="Status:", style='TLabel').grid(row=current_row, column=0, padx=5, pady=5, sticky="e")
+        self.status_combobox = ttk.Combobox(frame, values=SAMPLE_STATUS_OPTIONS, state="readonly", width=27, style='TCombobox')
         self.status_combobox.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         self.status_combobox.set(SAMPLE_STATUS_OPTIONS[0]) # Default to "pending approval"
         current_row += 1
 
-        ttk.Button(frame, text="Add Sample to Batch", command=lambda: self._submit_single_sample(form)).grid(row=current_row, column=0, columnspan=2, pady=15)
+        ttk.Button(frame, text="Add Sample to Batch", command=lambda: self._submit_single_sample(form), style='Success.TButton').grid(row=current_row, column=0, columnspan=2, pady=15)
         form.protocol("WM_DELETE_WINDOW", form.destroy)
         logging.info("Single sample form opened.")
 
@@ -1774,29 +1837,30 @@ class UserLogic:
 
         form = tk.Toplevel(self.root)
         form.title(f"Edit Sample {display_sample_id}")
-        form.geometry("400x250")
+        form.geometry("450x250")
         form.grab_set()
         form.transient(self.root)
+        form.config(bg='#f0f0f0') # Set background
 
         current_row = 0
 
-        tk.Label(form, text="Sample ID:").grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
-        entry_sample_display_id = ttk.Entry(form)
+        ttk.Label(form, text="Sample ID:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        entry_sample_display_id = ttk.Entry(form, style='TEntry')
         entry_sample_display_id.insert(0, row.get('sample_id', ''))
         entry_sample_display_id.config(state='disabled') # Sample ID is usually not editable
         entry_sample_display_id.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         current_row += 1
 
-        tk.Label(form, text="Sample Owner:").grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
-        edit_owner_combobox = ttk.Combobox(form, state="readonly")
+        ttk.Label(form, text="Sample Owner:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        edit_owner_combobox = ttk.Combobox(form, state="readonly", style='TCombobox')
         self._load_users_into_owner_combobox(edit_owner_combobox)
         edit_owner_combobox.set(row.get('owner', ''))
         edit_owner_combobox.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         current_row += 1
 
-        tk.Label(form, text="Maturation Date (YYYY-MM-DD):").grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(form, text="Maturation Date (YYYY-MM-DD):", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
         self.edit_mat_date_entry = DateEntry(form, width=28, background='darkblue', foreground='white', borderwidth=2,
-                                         date_pattern='yyyy-mm-dd')
+                                         date_pattern='yyyy-mm-dd') # TkCalendar styling
         self.edit_mat_date_entry.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         
         # Set the current maturation date or a default empty date
@@ -1815,15 +1879,15 @@ class UserLogic:
             self.edit_mat_date_entry.set_date(datetime(1,1,1).date())
         current_row += 1
 
-        tk.Label(form, text="Status:").grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
-        status_combobox_edit = ttk.Combobox(form, values=SAMPLE_STATUS_OPTIONS, state="readonly")
+        ttk.Label(form, text="Status:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        status_combobox_edit = ttk.Combobox(form, values=SAMPLE_STATUS_OPTIONS, state="readonly", style='TCombobox')
         status_combobox_edit.set(row.get('status', SAMPLE_STATUS_OPTIONS[0]))
         status_combobox_edit.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         current_row += 1
 
         ttk.Button(form, text="Save Changes", command=lambda: self._submit_edit_sample(
             form, firestore_doc_id, edit_owner_combobox.get(), self.edit_mat_date_entry.get_date(), status_combobox_edit.get()
-        )).grid(row=current_row, column=0, columnspan=2, pady=15)
+        ), style='Success.TButton').grid(row=current_row, column=0, columnspan=2, pady=15)
         form.protocol("WM_DELETE_WINDOW", form.destroy)
         logging.info("Edit sample form opened and populated.")
 
@@ -1873,53 +1937,54 @@ class UserLogic:
         logging.info("Opening filter form.")
         filter_form = tk.Toplevel(self.root)
         filter_form.title("Filter Options")
-        filter_form.geometry("450x450")
+        filter_form.geometry("450x500")
         filter_form.grab_set()
         filter_form.transient(self.root)
+        filter_form.config(bg='#f0f0f0') # Set background
 
         # Radio buttons to choose filtering mode
-        radio_frame = ttk.Frame(filter_form) # Removed padx/pady from constructor
-        radio_frame.pack(fill="x", padx=10, pady=10) # Applied padx/pady here
+        radio_frame = ttk.Frame(filter_form, style='TFrame') 
+        radio_frame.pack(fill="x", padx=10, pady=10) 
 
         ttk.Radiobutton(radio_frame, text="Filter Samples (by Sample/Batch/Product name)",
-                        variable=self.filter_mode, value="samples",
+                        variable=self.filter_mode, value="samples", style='TRadiobutton',
                         command=self._toggle_filter_frames).pack(anchor="w", pady=5)
         ttk.Radiobutton(radio_frame, text="Find Batch Details (by Batch ID)",
-                        variable=self.filter_mode, value="batch_search",
+                        variable=self.filter_mode, value="batch_search", style='TRadiobutton',
                         command=self._toggle_filter_frames).pack(anchor="w", pady=5)
 
         # Frames to hold specific filter options
-        self.sample_filters_frame = ttk.Frame(filter_form) # Removed padx/pady from constructor
-        self.batch_search_frame = ttk.Frame(filter_form) # Removed padx/pady from constructor
+        self.sample_filters_frame = ttk.Frame(filter_form, style='TFrame')
+        self.batch_search_frame = ttk.Frame(filter_form, style='TFrame')
 
         # Maturation Date Filter widgets within its own frame
-        self.maturation_date_filter_frame = ttk.Frame(self.sample_filters_frame)
+        self.maturation_date_filter_frame = ttk.Frame(self.sample_filters_frame, style='TFrame')
         ttk.Checkbutton(self.sample_filters_frame, text="Enable Maturation Date Filter",
-                        variable=self.filter_maturation_date_var,
+                        variable=self.filter_maturation_date_var, style='TCheckbutton',
                         command=self._toggle_maturation_filter_state).grid(row=0, column=0, sticky="w", pady=5, padx=5, columnspan=2)
 
-        ttk.Label(self.maturation_date_filter_frame, text="From (YYYY-MM-DD):").grid(row=0, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(self.maturation_date_filter_frame, text="From (YYYY-MM-DD):", style='TLabel').grid(row=0, column=0, sticky="e", pady=5, padx=5)
         self.filter_start_date_entry = DateEntry(self.maturation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
         self.filter_start_date_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
         self.filter_start_date_entry.set_date(datetime.now().date())
 
-        ttk.Label(self.maturation_date_filter_frame, text="To (YYYY-MM-DD):").grid(row=1, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(self.maturation_date_filter_frame, text="To (YYYY-MM-DD):", style='TLabel').grid(row=1, column=0, sticky="e", pady=5, padx=5)
         self.filter_end_date_entry = DateEntry(self.maturation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
         self.filter_end_date_entry.grid(row=1, column=1, sticky="ew", pady=5, padx=5)
         self.filter_end_date_entry.set_date(datetime.now().date())
 
         # Creation Date Filter widgets within its own frame
-        self.creation_date_filter_frame = ttk.Frame(self.sample_filters_frame)
+        self.creation_date_filter_frame = ttk.Frame(self.sample_filters_frame, style='TFrame')
         ttk.Checkbutton(self.sample_filters_frame, text="Enable Creation Date Filter",
-                        variable=self.filter_creation_date_var,
+                        variable=self.filter_creation_date_var, style='TCheckbutton',
                         command=self._toggle_creation_filter_state).grid(row=2, column=0, sticky="w", pady=5, padx=5, columnspan=2)
 
-        ttk.Label(self.creation_date_filter_frame, text="From (YYYY-MM-DD):").grid(row=0, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(self.creation_date_filter_frame, text="From (YYYY-MM-DD):", style='TLabel').grid(row=0, column=0, sticky="e", pady=5, padx=5)
         self.filter_creation_start_date_entry = DateEntry(self.creation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
         self.filter_creation_start_date_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
         self.filter_creation_start_date_entry.set_date(datetime.now().date())
 
-        ttk.Label(self.creation_date_filter_frame, text="To (YYYY-MM-DD):").grid(row=1, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(self.creation_date_filter_frame, text="To (YYYY-MM-DD):", style='TLabel').grid(row=1, column=0, sticky="e", pady=5, padx=5)
         self.filter_creation_end_date_entry = DateEntry(self.creation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
         self.filter_creation_end_date_entry.grid(row=1, column=1, sticky="ew", pady=5, padx=5)
         self.filter_creation_end_date_entry.set_date(datetime.now().date())
@@ -1931,38 +1996,38 @@ class UserLogic:
         # Other filters always visible, positioned after date filter frames
         current_filter_row = 4
 
-        ttk.Label(self.sample_filters_frame, text="Sample ID (similar/contains):").grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
-        self.filter_sample_id_entry = ttk.Entry(self.sample_filters_frame, width=30)
+        ttk.Label(self.sample_filters_frame, text="Sample ID (similar/contains):", style='TLabel').grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
+        self.filter_sample_id_entry = ttk.Entry(self.sample_filters_frame, width=30, style='TEntry')
         self.filter_sample_id_entry.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
         current_filter_row += 1
 
-        ttk.Label(self.sample_filters_frame, text="Batch ID (similar/contains):").grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
-        self.filter_batch_id_entry = ttk.Entry(self.sample_filters_frame, width=30)
+        ttk.Label(self.sample_filters_frame, text="Batch ID (similar/contains):", style='TLabel').grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
+        self.filter_batch_id_entry = ttk.Entry(self.sample_filters_frame, width=30, style='TEntry')
         self.filter_batch_id_entry.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
         current_filter_row += 1
 
-        ttk.Label(self.sample_filters_frame, text="Product Name (similar/contains):").grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
-        self.filter_product_name_entry = ttk.Entry(self.sample_filters_frame, width=30)
+        ttk.Label(self.sample_filters_frame, text="Product Name (similar/contains):", style='TLabel').grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
+        self.filter_product_name_entry = ttk.Entry(self.sample_filters_frame, width=30, style='TEntry')
         self.filter_product_name_entry.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
         current_filter_row += 1
 
-        ttk.Label(self.sample_filters_frame, text="Status:").grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
-        self.filter_status_combobox = ttk.Combobox(self.sample_filters_frame, values=[""] + SAMPLE_STATUS_OPTIONS, state="readonly", width=27)
+        ttk.Label(self.sample_filters_frame, text="Status:", style='TLabel').grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
+        self.filter_status_combobox = ttk.Combobox(self.sample_filters_frame, values=[""] + SAMPLE_STATUS_OPTIONS, state="readonly", width=27, style='TCombobox')
         self.filter_status_combobox.set("") # Default to empty to show all statuses
         self.filter_status_combobox.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
         current_filter_row += 1
 
         # Populate batch_search_frame
-        ttk.Label(self.batch_search_frame, text="Enter Batch ID:").grid(row=0, column=0, sticky="e", pady=5, padx=5)
-        self.find_batch_id_entry = ttk.Entry(self.batch_search_frame, width=30)
+        ttk.Label(self.batch_search_frame, text="Enter Batch ID:", style='TLabel').grid(row=0, column=0, sticky="e", pady=5, padx=5)
+        self.find_batch_id_entry = ttk.Entry(self.batch_search_frame, width=30, style='TEntry')
         self.find_batch_id_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
 
         # Buttons common to both modes
-        button_frame = ttk.Frame(filter_form) # Removed padding from constructor
-        button_frame.pack(fill="x", side="bottom", padx=10, pady=10) # Applied padx/pady here
+        button_frame = ttk.Frame(filter_form, style='TFrame')
+        button_frame.pack(fill="x", side="bottom", padx=10, pady=10)
 
-        ttk.Button(button_frame, text="Apply", command=lambda: self.apply_filters(filter_form)).pack(side=tk.LEFT, padx=5, pady=10)
-        ttk.Button(button_frame, text="Clear Filters", command=lambda: self.clear_filters(filter_form)).pack(side=tk.LEFT, padx=5, pady=10)
+        ttk.Button(button_frame, text="Apply", command=lambda: self.apply_filters(filter_form), style='Success.TButton').pack(side=tk.LEFT, padx=5, pady=10)
+        ttk.Button(button_frame, text="Clear Filters", command=lambda: self.clear_filters(filter_form), style='Secondary.TButton').pack(side=tk.LEFT, padx=5, pady=10)
 
         # Initial display of filter frames
         self._toggle_filter_frames()
@@ -2222,12 +2287,13 @@ class UserLogic:
         details_window.geometry("500x300")
         details_window.grab_set()
         details_window.transient(self.root)
+        details_window.config(bg='#f0f0f0') # Set background
 
-        text_frame = ttk.Frame(details_window, padding=10)
+        text_frame = ttk.Frame(details_window, padding=10, style='TFrame')
         text_frame.pack(expand=True, fill="both")
 
         text_widget = tk.Text(text_frame, wrap='word', font=('Consolas', 10),
-                              bg=details_window.cget('bg'), bd=0, highlightthickness=0)
+                              bg='#ffffff', bd=0, highlightthickness=0, foreground='#333333') # White background for text
         text_widget.pack(side=tk.LEFT, expand=True, fill="both")
 
         scrollbar = ttk.Scrollbar(text_frame, command=text_widget.yview)
@@ -2265,7 +2331,7 @@ class UserLogic:
         text_widget.insert(tk.END, details_str)
         text_widget.config(state='disabled')
 
-        ttk.Button(details_window, text="Close", command=details_window.destroy).pack(pady=10)
+        ttk.Button(details_window, text="Close", command=details_window.destroy, style='Secondary.TButton').pack(pady=10)
         details_window.protocol("WM_DELETE_WINDOW", details_window.destroy)
         logging.info(f"Batch details window displayed for {batch_data.get('batch_id', 'N/A')}.")
 
