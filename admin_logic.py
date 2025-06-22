@@ -11,7 +11,6 @@ import logging  # Import logging module for better debugging
 # Configure logging (optional, but good practice)
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 class AdminLogic:
     def __init__(self, root, app_instance):
         self.root = root
@@ -884,3 +883,5 @@ class AdminLogic:
             except Exception as e:
                 logging.error(f"Failed to export Excel file for approved batches: {e}", exc_info=True)
                 messagebox.showerror("Error", f"Failed to export Excel file:\n{e}")
+
+
