@@ -5,6 +5,7 @@ from firebase_setup import db
 from helpers import validate_email, validate_password, validate_employee_id
 from constants import MIN_PASSWORD_LENGTH
 
+
 class AuthManager:
     def __init__(self, root, app_instance):
         self.root = root
@@ -378,4 +379,3 @@ class AuthManager:
 
         ttk.Button(frame, text="Submit", command=submit, style="Accent.TButton").grid(row=6, column=0, columnspan=2, pady=15)
         form.protocol("WM_DELETE_WINDOW", form.destroy)
-
