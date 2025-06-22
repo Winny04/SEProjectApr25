@@ -6,6 +6,8 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from tkcalendar import DateEntry
+from tkinter import simpledialog
+
 
 
 class TesterLogic:
@@ -81,7 +83,7 @@ class TesterLogic:
     def filter_samples_by_maturation_date(self):
         """Filters and displays samples based on the provided maturation date range."""
         self.tester_tree.delete(*self.tester_tree.get_children())
-        self.tester_tree.tag_configure('urgent', background='khaki')  # Red for within 3 days
+        self.tester_tree.tag_configure('urgent', background='khaki')
         self.tester_tree.tag_configure('today', background='salmon')
         start_date_str = self.tester_mat_date_start_entry.get().strip()
         end_date_str = self.tester_mat_date_end_entry.get().strip()
@@ -164,10 +166,47 @@ class TesterLogic:
         except Exception as e:
             messagebox.showerror("Error", f"Failed to filter samples: {e}")
 
+    def prompt_reminder_period(self):
+        """Show a pop-up window with radio buttons to choose reminder period."""
+        reminder_window = tk.Toplevel(self.root)
+        reminder_window.title("Choose Reminder Period")
+        reminder_window.geometry("300x250")
+        reminder_window.grab_set()  # Make this pop-up modal
+
+        reminder_var = tk.StringVar(value="3d")  # default selection
+
+        options = [
+            ("Due Today", "0d"),
+            ("Within 3 Days", "3d"),
+            ("Within 1 Week", "1w"),
+            ("Within 2 Weeks", "2w"),
+            ("Within 1 Month", "1m"),
+            ("Within 2 Months", "2m")
+        ]
+
+        tk.Label(reminder_window, text="Select Reminder Period:", font=("Helvetica", 12)).pack(pady=10)
+
+        for label, value in options:
+            tk.Radiobutton(reminder_window, text=label, variable=reminder_var, value=value).pack(anchor="w", padx=20)
+
+        def submit_choice():
+            self.process_reminder_email(reminder_var.get())
+            reminder_window.destroy()
+
+        tk.Button(reminder_window, text="Send Reminder", command=submit_choice).pack(pady=15)
+
     def send_reminder_email(self):
-        """Sends reminder emails for pending samples using Gmail and App Password."""
+        self.prompt_reminder_period()
+
+    def process_reminder_email(self, period_code):
+        """Processes and sends emails based on selected period."""
+        days_map = {"0d": 0, "3d": 3, "1w": 7, "2w": 14, "1m": 30, "2m": 60}
+        days_threshold = days_map.get(period_code, 3)
+
         samples_to_remind = []
         recipients_map = {}
+
+        today = datetime.today()
 
         for item_id in self.tester_tree.get_children():
             values = self.tester_tree.item(item_id, "values")
@@ -181,32 +220,32 @@ class TesterLogic:
 
             try:
                 maturation_date = datetime.strptime(maturation_date_str, "%Y-%m-%d")
+                days_until = (maturation_date.date() - today.date()).days
             except ValueError:
                 continue
 
             if status == "pending":
-                samples_to_remind.append({
-                    "sample_id": sample_id,
-                    "owner": owner,
-                    "maturation_date": maturation_date_str,
-                    "batch_id": batch_id,
-                    "product_owner_email": product_owner_email,
-                    "test_team_emails": [email.strip() for email in test_team_email_str.split(',') if
-                                         email.strip() and email.strip() != "N/A"]
-                })
+                if (period_code == "0d" and days_until == 0) or (0 < days_until <= days_threshold):
+                    samples_to_remind.append({
+                        "sample_id": sample_id,
+                        "owner": owner,
+                        "maturation_date": maturation_date_str,
+                        "batch_id": batch_id,
+                        "product_owner_email": product_owner_email,
+                        "test_team_emails": [email.strip() for email in test_team_email_str.split(',') if
+                                             email.strip() and email.strip() != "N/A"]
+                    })
 
         if not samples_to_remind:
-            messagebox.showinfo("No Reminders", "No pending samples found within the specified range.")
+            messagebox.showinfo("No Reminders", f"No pending samples found for the selected period.")
             return
 
-        # Prepare email targets
+        # Map recipients
         for sample in samples_to_remind:
             po_email = sample["product_owner_email"]
             tt_emails = sample["test_team_emails"]
-
             if po_email and po_email != "N/A":
                 recipients_map.setdefault(po_email, []).append(sample)
-
             for email in tt_emails:
                 recipients_map.setdefault(email, []).append(sample)
 
@@ -214,7 +253,7 @@ class TesterLogic:
             messagebox.showinfo("No Recipients", "No valid email recipients found.")
             return
 
-        # --- Real Email Sending via Gmail ---
+        # Email config
         smtp_server = "smtp.gmail.com"
         smtp_port = 587
         sender_email = "test.dept7@gmail.com"
@@ -223,11 +262,11 @@ class TesterLogic:
         email_send_success = []
         email_send_fail = []
 
-        for recipient_email, samples_for_recipient in recipients_map.items():
-            subject = "Reminder: Expiring Samples Requiring Attention"
-            body = f"Dear User,\n\nThe following samples are pending and require your attention:\n\n"
-            for s in samples_for_recipient:
-                body += f"- Sample ID: {s['sample_id']}, Owner: {s['owner']}, Maturation Date: {s['maturation_date']}, Batch ID: {s['batch_id']}\n"
+        for recipient_email, samples in recipients_map.items():
+            subject = f"Reminder: Samples maturing soon"
+            body = "Dear User,\n\nThese samples require your attention:\n\n"
+            for s in samples:
+                body += f"- Sample ID: {s['sample_id']}, Owner: {s['owner']}, Maturation: {s['maturation_date']}, Batch: {s['batch_id']}\n"
             body += "\nPlease take necessary action.\n\nBest regards,\nSample Management System"
 
             msg = MIMEMultipart()
@@ -246,12 +285,9 @@ class TesterLogic:
                 email_send_fail.append(f"{recipient_email} ({e})")
 
         if email_send_success:
-            messagebox.showinfo("Reminder Sent",
-                                f"Emails sent to: {', '.join(email_send_success)}")
-
+            messagebox.showinfo("Reminder Sent", f"Emails sent to: {', '.join(email_send_success)}")
         if email_send_fail:
-            messagebox.showwarning("Some Failed",
-                                   f"Some emails failed:\n{chr(10).join(email_send_fail)}")
+            messagebox.showwarning("Some Failed", f"Some emails failed:\n{chr(10).join(email_send_fail)}")
 
         messagebox.showinfo("Done", "Reminder email process completed.")
 
