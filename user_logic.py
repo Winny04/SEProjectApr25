@@ -46,6 +46,7 @@ class UserLogic:
         self.filter_sample_id_entry = None
         self.filter_batch_id_entry = None # For sample filtering by batch ID
         self.filter_product_name_entry = None
+        self.filter_status_combobox = None # New: for status filter
 
         # New: Filter mode and specific batch search entry
         self.filter_mode = tk.StringVar(value="samples") # 'samples' or 'batch_search'
@@ -113,6 +114,9 @@ class UserLogic:
         # Logout button moved to the top-right of the toolbar
         ttk.Button(toolbar_top, text="Logout", command=self.app.logout).pack(side=tk.RIGHT, padx=5)
 
+        # New: Refresh button
+        ttk.Button(toolbar_top, text="Refresh", command=self.refresh_tree).pack(side=tk.RIGHT, padx=5)
+
         # Standalone "Load Today's Batches" button
         ttk.Button(toolbar_top, text="Load Today's Batches", command=self.load_todays_batches_to_tree).pack(side=tk.LEFT, padx=5)
 
@@ -167,6 +171,9 @@ class UserLogic:
 
         self.tree.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
 
+        # Bind double-click event to the Treeview
+        self.tree.bind("<Double-1>", self._on_tree_double_click)
+
         # === Status Bar ===
         self.status_label = tk.Label(self.root, text="Load samples from DB or import Excel.", anchor='w', bd=1, relief=tk.SUNKEN)
         self.status_label.pack(fill=tk.X, padx=10, pady=5)
@@ -198,6 +205,34 @@ class UserLogic:
         # Initial load when dashboard opens
         self.load_samples_paginated(query_type='all_samples', reset=True)
         logging.info("User dashboard loaded.")
+
+    def _on_tree_double_click(self, event):
+        """Handles double-click events on the Treeview."""
+        logging.info("Treeview double-click event detected.")
+        item_id = self.tree.identify_row(event.y)
+        if not item_id:
+            return
+
+        item_values = self.tree.item(item_id, 'values')
+        
+        # Check if the currently displayed data is batch data
+        # We can determine this by checking if the 'BatchID' column is wide and 'DisplaySampleID' is hidden
+        # Or, more robustly, by checking the 'last_loaded_query_type'
+        if self.last_loaded_query_type in ['batches', 'my_batches', 'todays_batches']:
+            # Assume it's a batch if batch-specific columns are visible or if last_loaded_query_type indicates batches
+            if len(item_values) > 1 and item_values[5] and item_values[5] != 'N/A': # Check if BatchID is present in Treeview values (index 5)
+                batch_id_from_tree = item_values[5]
+                logging.info(f"Double-clicked on batch with ID: {batch_id_from_tree}")
+                self.current_selected_batch_id = batch_id_from_tree
+                self.load_samples_for_current_batch()
+            else:
+                logging.warning("Double-clicked item is not recognized as a valid batch.")
+                messagebox.showwarning("Invalid Item", "Please double-click on a valid batch row.")
+        else:
+            logging.info("Double-click ignored as current view is not batches.")
+            # If it's a sample view, maybe do nothing or show info
+            # messagebox.showinfo("Info", "Double-click is for loading batch samples when viewing batches.")
+
 
     def load_samples_to_treeview(self, samples_list, is_pagination_load=False, current_page=1, total_pages=1):
         """Populates the Treeview widget with the given list of samples.
@@ -1842,6 +1877,13 @@ class UserLogic:
         self.filter_product_name_entry.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
         current_filter_row += 1
 
+        # New Status Filter
+        ttk.Label(self.sample_filters_frame, text="Status:").grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
+        self.filter_status_combobox = ttk.Combobox(self.sample_filters_frame, values=[""] + SAMPLE_STATUS_OPTIONS, state="readonly", width=27)
+        self.filter_status_combobox.set("") # Default to empty to show all statuses initially
+        self.filter_status_combobox.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
+        current_filter_row += 1
+
         # Populate batch_search_frame
         ttk.Label(self.batch_search_frame, text="Enter Batch ID:").grid(row=0, column=0, sticky="e", pady=5, padx=5)
         self.find_batch_id_entry = ttk.Entry(self.batch_search_frame, width=30)
@@ -1937,6 +1979,7 @@ class UserLogic:
             sample_id = self.filter_sample_id_entry.get().strip()
             batch_id = self.filter_batch_id_entry.get().strip()
             product_name = self.filter_product_name_entry.get().strip()
+            status = self.filter_status_combobox.get().strip() # New: Get status filter
 
             if sample_id:
                 filters['sample_id'] = sample_id
@@ -1944,6 +1987,8 @@ class UserLogic:
                 filters['batch_id'] = batch_id
             if product_name:
                 filters['product_name'] = product_name
+            if status: # New: Add status to filters if not empty
+                filters['status'] = status
             
             logging.info(f"Applying sample filters: {filters}")
             # This will load all samples first, then apply local filtering
@@ -2050,6 +2095,14 @@ class UserLogic:
                                 batch_product_names[b_id] = batch_doc.to_dict().get('product_name', '').lower()
                     df = df[df['batch_id'].apply(lambda x: product_name_filter_val in batch_product_names.get(x, '') if pd.notna(x) else False)]
                     logging.debug(f"Filtered by product_name, {len(df)} remaining.")
+
+                # New: Filter by status
+                if filters.get('status'):
+                    # Ensure the column exists and filter if not empty
+                    if 'status' in df.columns:
+                        df = df[df['status'].astype(str).str.contains(filters['status'], case=False, na=False)]
+                    logging.debug(f"Filtered by status: '{filters['status']}', {len(df)} remaining.")
+
 
                 # Apply secondary date filters locally if a Firestore range query was already applied for another date
                 # This ensures that if maturation date was used for the Firestore query, creation date can still be filtered locally.
@@ -2161,6 +2214,7 @@ class UserLogic:
             self.filter_sample_id_entry.delete(0, tk.END)
             self.filter_batch_id_entry.delete(0, tk.END)
             self.filter_product_name_entry.delete(0, tk.END)
+            self.filter_status_combobox.set("") # New: Clear status filter
             logging.info("Sample filters cleared.")
         elif self.filter_mode.get() == "batch_search" and self.find_batch_id_entry:
             self.find_batch_id_entry.delete(0, tk.END)
