@@ -142,6 +142,8 @@ class AdminLogic:
             side="left", padx=5)
         ttk.Button(btn_batch_frame, text="View Samples", command=self.admin_view_samples_for_batch).pack(side="left",
                                                                                                          padx=5)
+        ttk.Button(btn_batch_frame, text="Delete Batch", command=self.delete_batch).pack(side="left", padx=5)
+
         # Removed the "View Approved Batches" button here as well
         self.load_batches(self.batch_filter_var.get())  # Load batches based on initial filter value
 
@@ -723,9 +725,78 @@ class AdminLogic:
 
         form_window.wait_window()  # Wait for the form window to close
 
-    # Removed admin_view_approved_batches method entirely
-    # Removed _load_approved_batches_into_tree method entirely
-    # Removed _view_samples_from_approved_batch method entirely
+    def delete_batch(self):
+        """Deletes a selected batch and all its associated samples from Firestore."""
+        logging.info("Starting delete_batch process.")
+        selected = self.batches_tree.selection()  # Changed self.tree to self.batches_tree
+        if not selected:
+            messagebox.showinfo("Info", "Please select a batch to delete.")
+            logging.warning("Delete batch aborted: No batch selected.")
+            return
+
+        item = self.batches_tree.item(selected[0])  # Changed self.tree to self.batches_tree
+        # Ensure the selected item is actually a batch. Check if BatchID column is visible.
+        # This is a heuristic; a more robust way would be to check self.last_loaded_query_type
+        # Assuming that the first item in values is the document ID and the fifth is the visible BatchID.
+        # This part requires careful alignment with how batches are loaded into the treeview.
+        # The column check for "BatchID" option="width" == 0 might not be reliable here,
+        # it's better to rely on the context of which treeview is being displayed.
+        # Since this is in admin_logic and targets batches_tree, it's safer to assume it's a batch.
+
+        # DocID for batches is in item['values'][0] if that's how it's inserted.
+        # In current load_batches, item.id is the firestore document ID.
+        firestore_batch_doc_id = selected[0]  # Use the iid from selection as Firestore document ID
+        # The displayed BatchID is typically the first value in the treeview's values tuple
+        batch_id_display = item['values'][0]  # Assuming BatchID is the first column in batches_tree
+
+        logging.info(f"Attempting to delete batch: DocID='{firestore_batch_doc_id}', BatchID='{batch_id_display}'")
+
+        confirm = messagebox.askyesno("Confirm Delete Batch",
+                                      f"Are you sure you want to delete Batch '{batch_id_display}'?\n\n"
+                                      "This will PERMANENTLY DELETE ALL SAMPLES associated with this batch as well. This action cannot be undone.")
+        if not confirm:
+            logging.info("Delete batch aborted: User cancelled.")
+            return
+
+        try:
+            batch_write = db.batch()
+
+            # 1. Delete all samples associated with this batch
+            # Use 'batch_id' field in samples collection, which stores the human-readable batch_id_display
+            samples_to_delete = db.collection("samples").where("batch_id", "==", batch_id_display).stream()
+            deleted_samples_count = 0
+            for sample_doc in samples_to_delete:
+                batch_write.delete(sample_doc.reference)
+                deleted_samples_count += 1
+            logging.info(f"Prepared to delete {deleted_samples_count} samples for batch '{batch_id_display}'.")
+
+            # 2. Delete the batch document itself
+            batch_doc_ref = db.collection("batches").document(firestore_batch_doc_id)
+            batch_write.delete(batch_doc_ref)
+            logging.info(f"Prepared to delete batch document: {firestore_batch_doc_id}.")
+
+            # Commit the batch operation
+            batch_write.commit()
+            logging.info("Firestore batch committed successfully (batch and samples deleted).")
+
+            messagebox.showinfo("Success",
+                                f"Batch '{batch_id_display}' and its {deleted_samples_count} associated samples deleted successfully.")
+            logging.info(f"Batch '{batch_id_display}' and its samples deleted.")
+
+            # Refresh the Treeview to reflect the deletion
+            # The current AdminLogic loads batches based on a filter. Reload with the active filter.
+            self.load_batches(self.batch_filter_var.get())
+
+            if hasattr(self.app, 'admin_logic'):
+                # Ensure admin_logic's load_batches is called if this class is not 'admin_logic' itself
+                # (Though it is, this check is redundant here but good for general robustness)
+                self.app.admin_logic.load_batches(self.batch_filter_var.get())
+
+            logging.info("Batch data reloaded and tree refreshed after deletion.")
+
+        except Exception as e:
+            logging.error(f"Failed to delete batch '{batch_id_display}': {e}", exc_info=True)
+            messagebox.showerror("Error", f"Failed to delete batch and its samples:\n{e}")
 
     def export_user_batches(self):
         """Exports approved batches and their associated samples to an Excel file."""
