@@ -13,12 +13,7 @@ from tkinter import simpledialog
 
 
 class TesterLogic:
-    def __init__(self, root, app_instance):
-        self.root = root
-        self.app = app_instance
-        self.tester_mat_date_start_entry = None
-        self.tester_mat_date_end_entry = None
-        self.tester_tree = None  # Treeview for displaying samples in Tester dashboard
+
 
     def tester_dashboard(self):
         """Displays the Tester dashboard with features for date range filtering and email reminders."""
