@@ -456,17 +456,29 @@ class UserLogic:
                 
                 if aggregate_query_snapshot:
                     try:
+                        # Try the direct access first (expected for current firebase-admin versions)
                         total_count = aggregate_query_snapshot[0].value
+                    except AttributeError:
+                        # If .value is not found, it might be due to nesting as observed in logs
+                        if isinstance(aggregate_query_snapshot[0], list) and len(aggregate_query_snapshot[0]) > 0:
+                            # Attempt to access the value from the first item of the nested list
+                            nested_item = aggregate_query_snapshot[0][0]
+                            if hasattr(nested_item, 'value'):
+                                total_count = nested_item.value
+                            else:
+                                logging.error(f"Nested item in aggregate_query_snapshot[0] does not have 'value' attribute: {type(nested_item)}")
+                                total_count = 0
+                        else:
+                            logging.error(f"AggregateResult object at index 0 does not have 'value' attribute (and not nested list): {type(aggregate_query_snapshot[0])}", exc_info=True)
+                            total_count = 0
                     except IndexError:
-                        logging.warning("AggregateQuerySnapshot was empty, cannot get count value via [0].")
-                        total_count = 0 # No results, so count is 0
-                    except AttributeError as ae:
-                        logging.error(f"AggregateResult object at index 0 does not have 'value' attribute: {ae}", exc_info=True)
-                        logging.error(f"Type of aggregate_query_snapshot[0]: {type(aggregate_query_snapshot[0])}")
-                        total_count = 0 # Cannot get count, default to 0
+                        logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds.")
+                        total_count = 0
                     except Exception as unexpected_e:
                         logging.error(f"Unexpected error when getting total count for all samples: {unexpected_e}", exc_info=True)
                         total_count = 0
+                else:
+                    total_count = 0
                 logging.info(f"Total count for all samples: {total_count}")
                 
                 if docs and len(docs) == self.samples_per_page:
@@ -483,17 +495,29 @@ class UserLogic:
                 
                 if aggregate_query_snapshot:
                     try:
+                        # Try the direct access first (expected for current firebase-admin versions)
                         total_count = aggregate_query_snapshot[0].value
+                    except AttributeError:
+                        # If .value is not found, it might be due to nesting as observed in logs
+                        if isinstance(aggregate_query_snapshot[0], list) and len(aggregate_query_snapshot[0]) > 0:
+                            # Attempt to access the value from the first item of the nested list
+                            nested_item = aggregate_query_snapshot[0][0]
+                            if hasattr(nested_item, 'value'):
+                                total_count = nested_item.value
+                            else:
+                                logging.error(f"Nested item in aggregate_query_snapshot[0] does not have 'value' attribute: {type(nested_item)}")
+                                total_count = 0
+                        else:
+                            logging.error(f"AggregateResult object at index 0 does not have 'value' attribute (and not nested list): {type(aggregate_query_snapshot[0])}", exc_info=True)
+                            total_count = 0
                     except IndexError:
-                        logging.warning("AggregateQuerySnapshot was empty, cannot get count value via [0].")
-                        total_count = 0 # No results, so count is 0
-                    except AttributeError as ae:
-                        logging.error(f"AggregateResult object at index 0 does not have 'value' attribute: {ae}", exc_info=True)
-                        logging.error(f"Type of aggregate_query_snapshot[0]: {type(aggregate_query_snapshot[0])}")
-                        total_count = 0 # Cannot get count, default to 0
+                        logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds.")
+                        total_count = 0
                     except Exception as unexpected_e:
                         logging.error(f"Unexpected error when getting total count for my samples: {unexpected_e}", exc_info=True)
                         total_count = 0
+                else:
+                    total_count = 0
                 logging.info(f"Total count for my samples: {total_count}")
                 
                 if docs and len(docs) == self.samples_per_page:
