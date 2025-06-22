@@ -90,7 +90,8 @@ class UserLogic:
         menubar = tk.Menu(self.root)
         
         filemenu = tk.Menu(menubar, tearoff=0)
-        filemenu.add_command(label="Import Excel (Local)", command=self.import_excel)
+        # Modified command to open import options
+        filemenu.add_command(label="Import Excel (Local/DB)", command=self.open_excel_import_options_form)
         filemenu.add_command(label="Export Excel (Local)", command=self.export_excel)
         menubar.add_cascade(label="File", menu=filemenu)
 
@@ -641,48 +642,317 @@ class UserLogic:
             self.status_label.config(text="Failed to load today's batches.")
 
 
-    def import_excel(self):
-        """Imports data from an Excel file into the application's local DataFrame.
-        This data is only for temporary local use and is not automatically linked to a batch in DB."""
-        logging.info("Attempting to import Excel file.")
+    def open_excel_import_options_form(self):
+        """Opens a Toplevel window to choose how to import Excel data (local, new batch, existing batch)."""
+        logging.info("Opening Excel import options form.")
+        import_options_form = tk.Toplevel(self.root)
+        import_options_form.title("Excel Import Options")
+        import_options_form.geometry("480x400")
+        import_options_form.grab_set()
+        import_options_form.transient(self.root)
+
+        frame = ttk.Frame(import_options_form, padding=15)
+        frame.pack(expand=True, fill="both")
+
+        self.excel_import_choice = tk.StringVar(value="local") # Default to local import
+        
+        # Section 1: Local Import
+        ttk.Radiobutton(frame, text="Import to Local Table (temporary)",
+                        variable=self.excel_import_choice, value="local",
+                        command=self._toggle_excel_import_fields).grid(row=0, column=0, columnspan=2, sticky="w", pady=5)
+        
+        # Section 2: Add to New Batch in Database
+        ttk.Radiobutton(frame, text="Add to New Batch in Database",
+                        variable=self.excel_import_choice, value="new_batch",
+                        command=self._toggle_excel_import_fields).grid(row=1, column=0, columnspan=2, sticky="w", pady=5)
+        
+        ttk.Label(frame, text="  New Product Name:").grid(row=2, column=0, sticky="e", pady=2, padx=5)
+        self.excel_new_batch_product_name_entry = ttk.Entry(frame, width=35, state="disabled")
+        self.excel_new_batch_product_name_entry.grid(row=2, column=1, sticky="ew", pady=2, padx=5)
+
+        ttk.Label(frame, text="  New Description:").grid(row=3, column=0, sticky="e", pady=2, padx=5)
+        self.excel_new_batch_description_entry = ttk.Entry(frame, width=35, state="disabled")
+        self.excel_new_batch_description_entry.grid(row=3, column=1, sticky="ew", pady=2, padx=5)
+
+        # Section 3: Add to Existing Batch in Database
+        ttk.Radiobutton(frame, text="Add to Existing Batch in Database",
+                        variable=self.excel_import_choice, value="existing_batch",
+                        command=self._toggle_excel_import_fields).grid(row=4, column=0, columnspan=2, sticky="w", pady=5)
+        
+        ttk.Label(frame, text="  Existing Batch ID:").grid(row=5, column=0, sticky="e", pady=2, padx=5)
+        self.excel_existing_batch_combobox = ttk.Combobox(frame, state="disabled", width=32)
+        self.excel_existing_batch_combobox.grid(row=5, column=1, sticky="ew", pady=2, padx=5)
+        self._load_existing_batches_into_combobox_for_excel_import(self.excel_existing_batch_combobox)
+
+
+        ttk.Button(frame, text="Select Excel File and Proceed", 
+                   command=lambda: self._handle_excel_import_choice(import_options_form)).grid(row=6, column=0, columnspan=2, pady=20)
+        
+        self._toggle_excel_import_fields() # Set initial state
+
+        import_options_form.protocol("WM_DELETE_WINDOW", import_options_form.destroy)
+        logging.info("Excel import options form opened.")
+
+    def _toggle_excel_import_fields(self):
+        """Toggles the state of Excel import fields based on selected radio button."""
+        choice = self.excel_import_choice.get()
+        logging.debug(f"Toggling Excel import fields. Current choice: {choice}")
+
+        # Reset all fields to disabled first
+        self.excel_new_batch_product_name_entry.config(state="disabled")
+        self.excel_new_batch_product_name_entry.delete(0, tk.END)
+        self.excel_new_batch_description_entry.config(state="disabled")
+        self.excel_new_batch_description_entry.delete(0, tk.END)
+        self.excel_existing_batch_combobox.config(state="disabled")
+        self.excel_existing_batch_combobox.set('') # Clear selection
+
+        if choice == "new_batch":
+            self.excel_new_batch_product_name_entry.config(state="normal")
+            self.excel_new_batch_description_entry.config(state="normal")
+        elif choice == "existing_batch":
+            self.excel_existing_batch_combobox.config(state="readonly")
+        logging.debug("Excel import fields toggled.")
+
+    def _load_existing_batches_into_combobox_for_excel_import(self, target_combobox):
+        """Loads batch IDs from Firestore into a specific combobox for Excel import."""
+        logging.info("Loading existing batches into combobox for Excel import.")
+        batches_ref = db.collection("batches")
+        try:
+            # Only load batches created by the current user
+            batches = batches_ref.where("user_employee_id", "==", self.app.current_user['employee_id']).stream()
+            batch_ids = [batch.id for batch in batches]
+            target_combobox['values'] = batch_ids
+            logging.info(f"Loaded {len(batch_ids)} existing batches for Excel import combobox.")
+        except Exception as e:
+            logging.error(f"Failed to load existing batches for Excel import combobox: {e}", exc_info=True)
+            messagebox.showerror("Error", f"Failed to load existing batches for Excel import: {e}")
+            target_combobox['values'] = []
+
+    def _handle_excel_import_choice(self, form_window):
+        """Handles the user's choice for Excel import."""
+        logging.info("Handling Excel import choice.")
         filetypes = (("Excel files", "*.xlsx *.xls"), ("All files", "*.*"))
         filename = filedialog.askopenfilename(title="Open Excel file", filetypes=filetypes)
-        if filename:
-            try:
-                self.app.data = pd.read_excel(filename)
-                if 'Status' not in self.app.data.columns:
-                    self.app.data['Status'] = 'pending'
-                if 'BatchID' not in self.app.data.columns:
-                    self.app.data['BatchID'] = 'N/A (Local)'
-                if 'SampleID' in self.app.data.columns:
-                    self.app.data.rename(columns={'SampleID': 'DisplaySampleID'}, inplace=True)
-                if 'CreationDate' not in self.app.data.columns:
-                    self.app.data['CreationDate'] = None
-                self.app.data['DocID'] = 'N/A (Local)'
+        
+        if not filename:
+            logging.info("Excel file selection cancelled.")
+            return # User cancelled file selection
 
-                # Reset sample pagination state when importing excel
-                self.current_page_index = 0
-                self.all_samples_page_cursors = []
-                self.my_samples_page_cursors = []
-                self.last_loaded_query_type = 'excel_import' # Indicate data source is local excel
+        df = None
+        try:
+            df = pd.read_excel(filename)
+            logging.info(f"Successfully read Excel file: {filename}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to read Excel file:\n{e}")
+            logging.error(f"Failed to read Excel file {filename}: {e}", exc_info=True)
+            return
 
-                self.app.file_path = filename
-                self.load_samples_to_treeview(self.app.data.to_dict('records'), is_pagination_load=True) # Use the refactored function
-                self.status_label.config(text=f"Loaded data from {os.path.basename(filename)} (Local)")
-                self.excel_imported = True
+        # Sanitize column names: strip whitespace and convert to lowercase for robust matching
+        df.columns = df.columns.str.strip()
+        df.columns = df.columns.str.lower() # Convert to lowercase for consistent comparison
 
-                self.current_selected_batch_id = None
-                self.add_single_sample_button.config(state=tk.DISABLED)
+        # Map potential variations of column names to standardized ones
+        column_name_mapping = {
+            'sampleid': 'sample_id',
+            'owner': 'owner',
+            'maturationdate': 'maturation_date',
+            'status': 'status',
+            'batchid': 'batch_id',
+            'creationdate': 'creation_date',
+            'submitted_by_employee_id': 'submitted_by_employee_id',
+            'ubmitted_by_employee_ic': 'submitted_by_employee_id', # Handle the typo
+            'd_by_emp': 'submitted_by_employee_id', # Handling the 'd_by_emp' column from the image
+            'batch id': 'batch_id', # Added for clarity when reading exported files
+            'sample id': 'sample_id', # Added for clarity
+            'maturation date': 'maturation_date', # Added for clarity
+            'creation date': 'creation_date', # Added for clarity
+            'submitted by emp id': 'submitted_by_employee_id', # Added for clarity
+        }
+        df.rename(columns=column_name_mapping, inplace=True)
 
-                # Disable pagination controls for local excel
-                self.prev_sample_page_btn.config(state=tk.DISABLED)
-                self.next_sample_page_btn.config(state=tk.DISABLED)
-                self.page_info_label.config(text="Page 0 of 0")
-                logging.info(f"Successfully imported data from {filename}.")
+        # Ensure essential columns are present or add them
+        if 'sample_id' not in df.columns:
+            messagebox.showwarning("Missing Column", "Excel file must contain a 'SampleID' column (or 'sample_id').")
+            logging.warning("Excel file missing 'sample_id' column.")
+            return
+        if 'owner' not in df.columns:
+            messagebox.showwarning("Missing Column", "Excel file should ideally contain an 'Owner' column.")
+            df['owner'] = self.app.current_user.get('username', 'N/A') # Default owner
+            logging.warning("Excel file missing 'owner' column. Defaulting to current user.")
+        if 'maturation_date' not in df.columns:
+            messagebox.showwarning("Missing Column", "Excel file should ideally contain a 'MaturationDate' column.")
+            df['maturation_date'] = None # Default to None if missing
+            logging.warning("Excel file missing 'maturation_date' column. Defaulting to None.")
+        if 'status' not in df.columns:
+            df['status'] = SAMPLE_STATUS_OPTIONS[0] # Default status
+            logging.warning("Excel file missing 'status' column. Defaulting to first status option.")
+        if 'creation_date' not in df.columns: # Ensure creation_date is always present
+             df['creation_date'] = datetime.now()
+        if 'submitted_by_employee_id' not in df.columns: # Ensure submitted_by_employee_id is always present
+             df['submitted_by_employee_id'] = self.app.current_user.get('employee_id')
+        
+        # Convert date columns to datetime objects if they aren't already
+        for col in ['maturation_date', 'creation_date']:
+            if col in df.columns:
+                # Attempt to convert to datetime, coercing errors to NaT (Not a Time)
+                df[col] = pd.to_datetime(df[col], errors='coerce')
+                # Replace NaT with None instead of a default date
+                df[col] = df[col].apply(lambda x: x.to_pydatetime() if pd.notna(x) else None)
+        
+        choice = self.excel_import_choice.get()
+        if choice == "local":
+            self._import_excel_locally(df, filename, form_window)
+        elif choice == "new_batch":
+            product_name = self.excel_new_batch_product_name_entry.get().strip()
+            description = self.excel_new_batch_description_entry.get().strip()
+            self._add_excel_to_new_batch_db(df, product_name, description, form_window)
+        elif choice == "existing_batch":
+            batch_id = self.excel_existing_batch_combobox.get().strip()
+            self._add_excel_to_existing_batch_db(df, batch_id, form_window)
+        
+    def _import_excel_locally(self, df, filename, form_window):
+        """Imports data from a DataFrame into the application's local DataFrame."""
+        logging.info("Importing Excel data locally.")
+        self.app.data = df
+        self.app.file_path = filename
+        self.load_samples_to_treeview(self.app.data.to_dict('records'), is_pagination_load=True)
+        self.status_label.config(text=f"Loaded data from {os.path.basename(filename)} (Local)")
+        self.excel_imported = True
+        self.current_selected_batch_id = None
+        self.add_single_sample_button.config(state=tk.DISABLED)
+        self.prev_sample_page_btn.config(state=tk.DISABLED)
+        self.next_sample_page_btn.config(state=tk.DISABLED)
+        self.page_info_label.config(text="Page 0 of 0")
+        messagebox.showinfo("Success", f"Excel data loaded locally from {os.path.basename(filename)}.")
+        form_window.destroy()
+        logging.info("Excel data imported locally.")
 
-            except Exception as e:
-                logging.error(f"Failed to load Excel file: {e}", exc_info=True)
-                messagebox.showerror("Error", f"Failed to load Excel file:\n{e}")
+    def _add_excel_to_new_batch_db(self, df, product_name, description, form_window):
+        """Adds Excel data to a new batch in Firestore."""
+        logging.info("Adding Excel data to a new batch in DB.")
+        if not product_name:
+            messagebox.showerror("Error", "Product Name is required for a new batch.")
+            logging.warning("Product Name missing for new batch from Excel.")
+            return
+
+        new_batch_id = f"batch_{self.app.current_user['employee_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
+        if db.collection("batches").document(new_batch_id).get().exists:
+            messagebox.showerror("Error", "Generated Batch ID already exists. Please try again.")
+            logging.error(f"Generated batch ID '{new_batch_id}' already exists.")
+            return
+
+        new_batch_data = {
+            "batch_id": new_batch_id,
+            "product_name": product_name,
+            "description": description,
+            "submission_date": datetime.now(),
+            "user_employee_id": self.app.current_user['employee_id'],
+            "user_username": self.app.current_user['username'],
+            "user_email": self.app.current_user['email'],
+            "status": "pending approval",
+            "number_of_samples": 0 # Will be incremented as samples are added
+        }
+
+        try:
+            batch_write = db.batch()
+            batch_doc_ref = db.collection("batches").document(new_batch_id)
+            batch_write.set(batch_doc_ref, new_batch_data)
+
+            samples_added_count = 0
+            for index, row in df.iterrows():
+                # Check for duplicate sample_id for each row
+                sample_id = row['sample_id']
+                existing_samples_with_display_id = db.collection("samples").where("sample_id", "==", sample_id).limit(1).get()
+                if list(existing_samples_with_display_id):
+                    logging.warning(f"Skipping duplicate sample ID '{sample_id}' from Excel import.")
+                    continue # Skip this sample
+
+                sample_data = {
+                    "sample_id": row['sample_id'],
+                    "owner": row['owner'],
+                    "maturation_date": row['maturation_date'],
+                    "status": row['status'],
+                    "batch_id": new_batch_id,
+                    "creation_date": row['creation_date'],
+                    "submitted_by_employee_id": row['submitted_by_employee_id']
+                }
+                sample_doc_ref = db.collection("samples").document()
+                batch_write.set(sample_doc_ref, sample_data)
+                samples_added_count += 1
+            
+            # Update the batch's sample count
+            batch_write.update(batch_doc_ref, {"number_of_samples": firebase_admin.firestore.Increment(samples_added_count)})
+
+            batch_write.commit()
+            messagebox.showinfo("Success", f"Excel data successfully added to new batch '{new_batch_id}' with {samples_added_count} samples.")
+            logging.info(f"Excel data added to new batch '{new_batch_id}' with {samples_added_count} samples.")
+
+            self.current_selected_batch_id = new_batch_id
+            self.load_samples_for_current_batch()
+            if hasattr(self.app, 'admin_logic'):
+                self.app.admin_logic.load_batches()
+            form_window.destroy()
+
+        except Exception as e:
+            logging.error(f"Failed to add Excel data to new batch: {e}", exc_info=True)
+            messagebox.showerror("Error", f"Failed to add Excel data to new batch:\n{e}")
+
+    def _add_excel_to_existing_batch_db(self, df, batch_id, form_window):
+        """Adds Excel data to an existing batch in Firestore."""
+        logging.info(f"Adding Excel data to existing batch '{batch_id}' in DB.")
+        if not batch_id:
+            messagebox.showerror("Error", "Please select an existing Batch ID.")
+            logging.warning("No batch ID selected for existing batch import.")
+            return
+
+        batch_doc_ref = db.collection("batches").document(batch_id)
+        existing_batch_doc = batch_doc_ref.get()
+
+        if not existing_batch_doc.exists:
+            messagebox.showerror("Error", f"Batch ID '{batch_id}' does not exist.")
+            logging.error(f"Selected existing batch ID '{batch_id}' not found.")
+            return
+
+        try:
+            batch_write = db.batch()
+            samples_added_count = 0
+            for index, row in df.iterrows():
+                # Check for duplicate sample_id for each row
+                sample_id = row['sample_id']
+                existing_samples_with_display_id = db.collection("samples").where("sample_id", "==", sample_id).limit(1).get()
+                if list(existing_samples_with_display_id):
+                    logging.warning(f"Skipping duplicate sample ID '{sample_id}' from Excel import.")
+                    continue # Skip this sample
+
+                sample_data = {
+                    "sample_id": row['sample_id'],
+                    "owner": row['owner'],
+                    "maturation_date": row['maturation_date'],
+                    "status": row['status'],
+                    "batch_id": batch_id,
+                    "creation_date": row['creation_date'],
+                    "submitted_by_employee_id": row['submitted_by_employee_id']
+                }
+                sample_doc_ref = db.collection("samples").document()
+                batch_write.set(sample_doc_ref, sample_data)
+                samples_added_count += 1
+
+            # Update the batch's sample count
+            batch_write.update(batch_doc_ref, {"number_of_samples": firebase_admin.firestore.Increment(samples_added_count)})
+
+            batch_write.commit()
+            messagebox.showinfo("Success", f"Excel data successfully added to existing batch '{batch_id}' with {samples_added_count} new samples.")
+            logging.info(f"Excel data added to existing batch '{batch_id}' with {samples_added_count} new samples.")
+
+            self.current_selected_batch_id = batch_id
+            self.load_samples_for_current_batch()
+            if hasattr(self.app, 'admin_logic'):
+                self.app.admin_logic.load_batches()
+            form_window.destroy()
+
+        except Exception as e:
+            logging.error(f"Failed to add Excel data to existing batch: {e}", exc_info=True)
+            messagebox.showerror("Error", f"Failed to add Excel data to existing batch:\n{e}")
 
     def export_excel(self):
         """Exports current data in the local DataFrame to an Excel file."""
@@ -691,28 +961,92 @@ class UserLogic:
             messagebox.showwarning("Warning", "No data to export.")
             logging.warning("No data found to export to Excel.")
             return
+        
         filetypes = (("Excel files", "*.xlsx"),)
         filename = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=filetypes)
+        
         if filename:
             try:
-                df_to_export = self.app.data.copy()
-                if 'BatchID' in df_to_export.columns:
-                    df_to_export.rename(columns={'BatchID': 'batch_id'}, inplace=True)
-                if 'DisplaySampleID' in df_to_export.columns:
-                    df_to_export.rename(columns={'DisplaySampleID': 'SampleID'}, inplace=True)
-                if 'DocID' in df_to_export.columns:
-                    df_to_export = df_to_export.drop(columns=['DocID'])
-                if 'CreationDate' in df_to_export.columns:
-                    df_to_export.rename(columns={'CreationDate': 'creation_date'}, inplace=True)
-                if 'MaturationDate' in df_to_export.columns: # Ensure maturation_date is handled correctly
-                    df_to_export.rename(columns={'MaturationDate': 'maturation_date'}, inplace=True)
+                # Create a copy to avoid modifying the original app.data DataFrame directly
+                df_to_prepare = self.app.data.copy()
 
-                for col in df_to_export.columns:
-                    if pd.api.types.is_datetime64_any_dtype(df_to_export[col]):
-                        if df_to_export[col].dt.tz is not None:
-                            df_to_export[col] = df_to_export[col].dt.tz_localize(None)
+                # Define the desired standardized Excel output header names
+                # These match the expected input format for the import function (lowercase, underscore for spaces)
+                expected_import_headers = {
+                    'batch_id',
+                    'submitted_by_employee_id',
+                    'status',
+                    'sample_id',
+                    'owner',
+                    'maturation_date',
+                    'creation_date'
+                }
 
-                df_to_export.to_excel(filename, index=False)
+                # Dynamically create the column rename map to ensure the keys are the *current* DataFrame columns
+                # and values are the *desired* export column names (which are the expected import headers).
+                # The import function normalizes to lowercase and replaces spaces, so we should export in that format.
+                column_rename_map = {}
+                for col in df_to_prepare.columns:
+                    # Normalize the current column name from the DataFrame to a potential import-friendly format
+                    normalized_col = col.lower().replace(' ', '_').replace('display', '').strip('_')
+                    
+                    # Special handling for "DocID" to ensure it's not exported
+                    if 'docid' in normalized_col:
+                        continue # Skip this column entirely
+
+                    # Match specific Treeview/internal names to the exact desired export format
+                    if col == 'BatchID':
+                        column_rename_map[col] = 'batch_id'
+                    elif col == 'DisplaySampleID':
+                        column_rename_map[col] = 'sample_id'
+                    elif col == 'Owner':
+                        column_rename_map[col] = 'owner'
+                    elif col == 'MaturationDate':
+                        column_rename_map[col] = 'maturation_date'
+                    elif col == 'Status':
+                        column_rename_map[col] = 'status'
+                    elif col == 'CreationDate':
+                        column_rename_map[col] = 'creation_date'
+                    elif col == 'submitted_by_employee_id': # Ensure it's explicitly handled if it's already in this format
+                        column_rename_map[col] = 'submitted_by_employee_id'
+                    elif col == 'd_by_emp': # Handle the common typo from import side as well
+                         column_rename_map[col] = 'submitted_by_employee_id'
+                    # Default: if a column isn't explicitly mapped, just convert it to lowercase with underscores
+                    elif col.lower().replace(' ', '_') in expected_import_headers:
+                         column_rename_map[col] = col.lower().replace(' ', '_')
+                    else:
+                        # Fallback for any other columns, though ideally they should be explicitly mapped
+                        logging.warning(f"Column '{col}' not explicitly mapped for export. Defaulting to lowercase_with_underscores.")
+                        column_rename_map[col] = col.lower().replace(' ', '_')
+
+
+                # Rename columns in the copied DataFrame using the constructed map
+                df_to_prepare.rename(columns=column_rename_map, inplace=True, errors='ignore')
+
+                # Define the final desired order of columns in the Excel file
+                # These are the *exact* headers the import function is designed to read after normalization.
+                final_excel_output_order = [
+                    'batch_id',
+                    'submitted_by_employee_id',
+                    'status',
+                    'sample_id',
+                    'owner',
+                    'maturation_date',
+                    'creation_date'
+                ]
+                
+                # Reindex the DataFrame to select only the desired columns and put them in the correct order.
+                # Any columns in `final_excel_output_order` not present in `df_to_prepare` after renaming
+                # will be added as columns filled with NaN (which Pandas exports as empty cells).
+                df_for_export_final = df_to_prepare.reindex(columns=final_excel_output_order)
+
+                # Handle datetime objects to ensure they are timezone-naive before export
+                for col in df_for_export_final.columns:
+                    if pd.api.types.is_datetime64_any_dtype(df_for_export_final[col]):
+                        if df_for_export_final[col].dt.tz is not None:
+                            df_for_export_final[col] = df_for_export_final[col].dt.tz_localize(None)
+
+                df_for_export_final.to_excel(filename, index=False)
                 self.status_label.config(text=f"Data exported to {os.path.basename(filename)}")
                 logging.info(f"Successfully exported data to {filename}.")
             except Exception as e:
@@ -1140,7 +1474,7 @@ class UserLogic:
 
         try:
             # Checking for duplicate sample_id across the entire 'samples' collection
-            # You might need an index on 'sample_id' for this query.
+            # You might need an an index on 'sample_id' for this query.
             existing_samples_with_display_id = db.collection("samples").where("sample_id", "==", sample_display_id).limit(1).get()
             if list(existing_samples_with_display_id): # Convert to list to check if it's empty
                 messagebox.showerror("Error", "Sample ID already exists in the database. Please use a unique ID.")
@@ -1311,7 +1645,7 @@ class UserLogic:
 
         form = tk.Toplevel(self.root)
         form.title(f"Edit Sample {display_sample_id}")
-        form.geometry("300x450")
+        form.geometry("400x300")
         form.grab_set()
         form.transient(self.root)
 
@@ -1723,14 +2057,14 @@ class UserLogic:
                 
                 # If maturation date filter was enabled and NOT applied in Firestore, apply locally
                 if 'start_date' in filters and 'end_date' in filters and not firestore_maturation_date_filter_applied:
-                    df = df[df['MaturationDate'].apply(lambda x: x and filters['start_date'] <= x)]
-                    df = df[df['MaturationDate'].apply(lambda x: x and x <= filters['end_date'])]
+                    df = df[df['maturation_date'].apply(lambda x: x and filters['start_date'] <= x)]
+                    df = df[df['maturation_date'].apply(lambda x: x and x <= filters['end_date'])]
                     logging.debug(f"Applied local maturation_date filter, {len(df)} remaining.")
                 
                 # If creation date filter was enabled and NOT applied in Firestore, apply locally
                 if 'creation_start_date' in filters and 'creation_end_date' in filters and not firestore_creation_date_filter_applied:
-                    df = df[df['CreationDate'].apply(lambda x: x and filters['creation_start_date'] <= x)]
-                    df = df[df['CreationDate'].apply(lambda x: x and x <= filters['creation_end_date'])]
+                    df = df[df['creation_date'].apply(lambda x: x and filters['creation_start_date'] <= x)]
+                    df = df[df['creation_date'].apply(lambda x: x and x <= filters['creation_end_date'])]
                     logging.debug(f"Applied local creation_date filter, {len(df)} remaining.")
 
             self.load_samples_to_treeview(df.to_dict('records')) # Use the refactored function
