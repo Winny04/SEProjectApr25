@@ -13,9 +13,11 @@ import firebase_admin
 
 # --- Logging Setup ---
 import logging
-logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-# --- End Logging Setup ---
 
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
+
+# --- End Logging Setup ---
 class UserLogic:
     def __init__(self, root, app_instance):
         self.root = root
@@ -28,34 +30,40 @@ class UserLogic:
         # Initialize ttk Style
         self.style = ttk.Style()
         # Set a modern theme, e.g., 'clam', 'alt', 'vista', 'xpnative'
-        self.style.theme_use('clam') 
+        self.style.theme_use('clam')
 
         # Configure general styles
         self.style.configure('TFrame', background='#f0f0f0')
         self.style.configure('TLabel', font=('Helvetica', 10), background='#f0f0f0', foreground='#333333')
-        
+
         # Configure different button styles
         # Primary button (e.g., for major actions like Select Batch, Add Sample)
-        self.style.configure('Primary.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#007bff', foreground='white', relief='raised')
-        self.style.map('Primary.TButton', background=[('active', '#0056b3')]) # Darken on hover
+        self.style.configure('Primary.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#007bff',
+                             foreground='white', relief='raised')
+        self.style.map('Primary.TButton', background=[('active', '#0056b3')])  # Darken on hover
 
-        self.style.configure('add.TButton', font=('Helvetica', 10, 'bold'), padding=8, background="#94e119", foreground='white', relief='raised')
+        self.style.configure('add.TButton', font=('Helvetica', 10, 'bold'), padding=8, background="#94e119",
+                             foreground='white', relief='raised')
         self.style.map('add.TButton', background=[('active', "#0ee969")])
 
         # Secondary button (e.g., for less critical actions like Refresh, Check Notifications)
-        self.style.configure('Secondary.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#6c757d', foreground='white', relief='raised')
+        self.style.configure('Secondary.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#6c757d',
+                             foreground='white', relief='raised')
         self.style.map('Secondary.TButton', background=[('active', '#545b62')])
 
         # Success button (e.g., for actions that add or confirm)
-        self.style.configure('Success.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#28a745', foreground='white', relief='raised')
+        self.style.configure('Success.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#28a745',
+                             foreground='white', relief='raised')
         self.style.map('Success.TButton', background=[('active', '#218838')])
 
         # Warning/Info button (e.g., for filters, generate barcode)
-        self.style.configure('Info.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#17a2b8', foreground='white', relief='raised')
+        self.style.configure('Info.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#17a2b8',
+                             foreground='white', relief='raised')
         self.style.map('Info.TButton', background=[('active', '#138496')])
 
         # Danger button (e.g., for delete actions)
-        self.style.configure('Danger.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#dc3545', foreground='white', relief='raised')
+        self.style.configure('Danger.TButton', font=('Helvetica', 10, 'bold'), padding=8, background='#dc3545',
+                             foreground='white', relief='raised')
         self.style.map('Danger.TButton', background=[('active', '#c82333')])
 
         # Configure Entry and Combobox styles
@@ -66,19 +74,19 @@ class UserLogic:
 
         # Configure Treeview style
         self.style.configure('Treeview',
-            font=('Helvetica', 9),
-            rowheight=25,
-            fieldbackground='#ffffff',
-            background='#ffffff',
-            foreground='#000000',
-            bordercolor='#cccccc',
-            lightcolor='#eeeeee',
-            darkcolor='#bbbbbb'
-        )
-        self.style.map('Treeview', background=[('selected', '#347083')]) # Blue selection
-        self.style.configure('Treeview.Heading', font=('Helvetica', 10, 'bold'), background='#e0e0e0', foreground='#333333')
+                             font=('Helvetica', 9),
+                             rowheight=25,
+                             fieldbackground='#ffffff',
+                             background='#ffffff',
+                             foreground='#000000',
+                             bordercolor='#cccccc',
+                             lightcolor='#eeeeee',
+                             darkcolor='#bbbbbb'
+                             )
+        self.style.map('Treeview', background=[('selected', '#347083')])  # Blue selection
+        self.style.configure('Treeview.Heading', font=('Helvetica', 10, 'bold'), background='#e0e0e0',
+                             foreground='#333333')
         self.style.map('Treeview.Heading', background=[('active', '#d0d0d0')])
-
 
         # Elements for forms (will be created dynamically)
         self.existing_batch_combobox = None
@@ -104,10 +112,10 @@ class UserLogic:
 
         self.filter_mode = tk.StringVar(value="samples")
         self.find_batch_id_entry = None
-        self.find_sample_id_entry = None # New: Entry for finding sample details
+        self.find_sample_id_entry = None  # New: Entry for finding sample details
         self.sample_filters_frame = None
         self.batch_search_frame = None
-        self.sample_search_frame = None # New: Frame for sample search
+        self.sample_search_frame = None  # New: Frame for sample search
 
         self.maturation_date_filter_frame = None
         self.creation_date_filter_frame = None
@@ -131,17 +139,16 @@ class UserLogic:
 
         logging.info("UserLogic initialized.")
 
-
     def user_dashboard(self):
         """Displays the user dashboard with sample management features."""
         logging.info("Entering user_dashboard method.")
         self.app.clear_root()
         # Set root background color
-        self.root.config(bg='#f0f0f0') 
+        self.root.config(bg='#f0f0f0')
         self.root.geometry("1300x600")
         self.excel_imported = False
         self.current_selected_batch_id = None
-        
+
         # Reset pagination state for all views
         self.current_page_index = 0
         self.all_samples_page_cursors = []
@@ -151,49 +158,62 @@ class UserLogic:
 
         # === Menu Bar ===
         menubar = tk.Menu(self.root)
-        
+
         filemenu = tk.Menu(menubar, tearoff=0)
         filemenu.add_command(label="Import Excel (Local/DB)", command=self.open_excel_import_options_form)
         filemenu.add_command(label="Export Excel (Local)", command=self.export_excel)
         menubar.add_cascade(label="File", menu=filemenu)
 
         loadmenu = tk.Menu(menubar, tearoff=0)
-        loadmenu.add_command(label="Load All Samples", command=lambda: self.load_samples_paginated('all_samples', reset=True))
-        loadmenu.add_command(label="Load My Samples", command=lambda: self.load_samples_paginated('my_samples', reset=True))
+        loadmenu.add_command(label="Load All Samples",
+                             command=lambda: self.load_samples_paginated('all_samples', reset=True))
+        loadmenu.add_command(label="Load My Samples",
+                             command=lambda: self.load_samples_paginated('my_samples', reset=True))
         loadmenu.add_separator()
         loadmenu.add_command(label="Load All Batches", command=self.load_all_batches_to_tree)
         loadmenu.add_command(label="Load My Batches", command=self.load_my_batches_to_tree)
         menubar.add_cascade(label="Load", menu=loadmenu)
-        
+
         self.root.config(menu=menubar)
 
         # === Top Toolbar Frame for Buttons ===
         # Using 'Toolbar.TFrame' style for consistency
         toolbar_top = ttk.Frame(self.root, padding=(10, 10), style='TFrame')
-        toolbar_top.pack(fill="x", padx=10, pady=(10, 0)) # Add some top padding
+        toolbar_top.pack(fill="x", padx=10, pady=(10, 0))  # Add some top padding
 
         # Use different button styles
-        ttk.Button(toolbar_top, text="Logout", command=self.app.logout, style='Secondary.TButton').pack(side=tk.RIGHT, padx=5)
-        ttk.Button(toolbar_top, text="Refresh", command=self.refresh_tree, style='Secondary.TButton').pack(side=tk.RIGHT, padx=5)
-        ttk.Button(toolbar_top, text="Load Today's Batches", command=self.load_todays_batches_to_tree, style='Secondary.TButton').pack(side=tk.LEFT, padx=5)
-        ttk.Button(toolbar_top, text="Check Notifications", command=self.check_notifications, style='Info.TButton').pack(side=tk.LEFT, padx=5)
-        self.add_sample_main_button = ttk.Button(toolbar_top, text="Select Batch", command=self.open_batch_selection_screen, style='Primary.TButton')
+        ttk.Button(toolbar_top, text="Logout", command=self.app.logout, style='Secondary.TButton').pack(side=tk.RIGHT,
+                                                                                                        padx=5)
+        ttk.Button(toolbar_top, text="Refresh", command=self.refresh_tree, style='Secondary.TButton').pack(
+            side=tk.RIGHT, padx=5)
+        ttk.Button(toolbar_top, text="Load Today's Batches", command=self.load_todays_batches_to_tree,
+                   style='Secondary.TButton').pack(side=tk.LEFT, padx=5)
+        ttk.Button(toolbar_top, text="Check Notifications", command=self.check_notifications,
+                   style='Info.TButton').pack(side=tk.LEFT, padx=5)
+        self.add_sample_main_button = ttk.Button(toolbar_top, text="Select Batch",
+                                                 command=self.open_batch_selection_screen, style='Primary.TButton')
         self.add_sample_main_button.pack(side=tk.LEFT, padx=5)
-        self.add_single_sample_button = ttk.Button(toolbar_top, text="Add Sample to Current Batch", command=self.open_single_sample_form, state=tk.DISABLED, style='add.TButton')
+        self.add_single_sample_button = ttk.Button(toolbar_top, text="Add Sample to Current Batch",
+                                                   command=self.open_single_sample_form, state=tk.DISABLED,
+                                                   style='add.TButton')
         self.add_single_sample_button.pack(side=tk.LEFT, padx=5)
-        
-        self.edit_sample_button = ttk.Button(toolbar_top, text="Edit Sample", command=self.edit_sample, style='Info.TButton')
+
+        self.edit_sample_button = ttk.Button(toolbar_top, text="Edit Sample", command=self.edit_sample,
+                                             style='Info.TButton')
         self.edit_sample_button.pack(side=tk.LEFT, padx=5)
-        self.delete_sample_button = ttk.Button(toolbar_top, text="Delete Sample", command=self.delete_sample, style='Danger.TButton')
+        self.delete_sample_button = ttk.Button(toolbar_top, text="Delete Sample", command=self.delete_sample,
+                                               style='Danger.TButton')
         self.delete_sample_button.pack(side=tk.LEFT, padx=5)
 
-
         # === Treeview Frame for Data Display with Scrollbar ===
-        tree_frame = ttk.Frame(self.root, style='TFrame', relief='sunken', borderwidth=1) # Added relief and border
+        tree_frame = ttk.Frame(self.root, style='TFrame', relief='sunken', borderwidth=1)  # Added relief and border
         tree_frame.pack(expand=True, fill=tk.BOTH, padx=10, pady=10)
 
         # Treeview configured with style 'Treeview'
-        self.tree = ttk.Treeview(tree_frame, columns=["DocID", "DisplaySampleID", "Owner", "MaturationDate", "Status", "BatchID", "CreationDate", "ProductName", "Description", "SubmissionDate", "NumberOfSamples"], show='headings', style='Treeview')
+        self.tree = ttk.Treeview(tree_frame,
+                                 columns=["DocID", "DisplaySampleID", "Owner", "MaturationDate", "Status", "BatchID",
+                                          "CreationDate", "ProductName", "Description", "SubmissionDate",
+                                          "NumberOfSamples"], show='headings', style='Treeview')
 
         tree_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.tree.yview)
         self.tree.configure(yscrollcommand=tree_scrollbar.set)
@@ -237,29 +257,36 @@ class UserLogic:
         self.tree.bind("<Double-1>", self._on_tree_double_click)
 
         # === Status Bar ===
-        self.status_label = ttk.Label(self.root, text="Load samples from DB or import Excel.", anchor='w', 
-                                     font=('Helvetica', 9), background='#e0e0e0', foreground='#333333', relief=tk.SUNKEN, borderwidth=1)
-        self.status_label.pack(fill=tk.X, padx=10, pady=(5, 10)) # Add some bottom padding
+        self.status_label = ttk.Label(self.root, text="Load samples from DB or import Excel.", anchor='w',
+                                      font=('Helvetica', 9), background='#e0e0e0', foreground='#333333',
+                                      relief=tk.SUNKEN, borderwidth=1)
+        self.status_label.pack(fill=tk.X, padx=10, pady=(5, 10))  # Add some bottom padding
 
         # === Bottom Toolbar Frame for Generate Barcode, Pagination, and Filter Button ===
         bottom_toolbar = ttk.Frame(self.root, padding=(10, 5), style='TFrame')
         bottom_toolbar.pack(fill="x", padx=10, pady=(0, 10), side=tk.BOTTOM)
-        
-        ttk.Button(bottom_toolbar, text="Generate Barcode", command=self.generate_barcode, style='Info.TButton').pack(side=tk.LEFT, padx=5)
+
+        ttk.Button(bottom_toolbar, text="Generate Barcode", command=self.generate_barcode, style='Info.TButton').pack(
+            side=tk.LEFT, padx=5)
 
         pagination_frame = ttk.Frame(bottom_toolbar, style='TFrame')
         pagination_frame.pack(side=tk.LEFT, expand=True)
 
-        self.prev_sample_page_btn = ttk.Button(pagination_frame, text="Previous", command=lambda: self.navigate_samples_page('prev'), state=tk.DISABLED, style='Secondary.TButton')
+        self.prev_sample_page_btn = ttk.Button(pagination_frame, text="Previous",
+                                               command=lambda: self.navigate_samples_page('prev'), state=tk.DISABLED,
+                                               style='Secondary.TButton')
         self.prev_sample_page_btn.pack(side=tk.LEFT, padx=2)
 
         self.page_info_label = ttk.Label(pagination_frame, text="Page 1 of 1", style='TLabel')
         self.page_info_label.pack(side=tk.LEFT, padx=5)
 
-        self.next_sample_page_btn = ttk.Button(pagination_frame, text="Next", command=lambda: self.navigate_samples_page('next'), state=tk.DISABLED, style='Secondary.TButton')
+        self.next_sample_page_btn = ttk.Button(pagination_frame, text="Next",
+                                               command=lambda: self.navigate_samples_page('next'), state=tk.DISABLED,
+                                               style='Secondary.TButton')
         self.next_sample_page_btn.pack(side=tk.LEFT, padx=2)
-        
-        ttk.Button(bottom_toolbar, text="Filter Samples/Find Batch", command=self.open_filter_form, style='Info.TButton').pack(side=tk.RIGHT, padx=5)
+
+        ttk.Button(bottom_toolbar, text="Filter Samples/Find Batch", command=self.open_filter_form,
+                   style='Info.TButton').pack(side=tk.RIGHT, padx=5)
 
         self.load_samples_paginated(query_type='all_samples', reset=True)
         logging.info("User dashboard loaded.")
@@ -272,7 +299,7 @@ class UserLogic:
             return
 
         item_values = self.tree.item(item_id, 'values')
-        
+
         if self.last_loaded_query_type in ['batches', 'my_batches', 'todays_batches']:
             # Check if BatchID is present in Treeview values (index 5) and is valid
             if len(item_values) > 1 and item_values[5] and item_values[5] != 'N/A':
@@ -286,11 +313,11 @@ class UserLogic:
         else:
             logging.info("Double-click ignored as current view is not batches or is a local/filtered sample view.")
 
-
     def load_samples_to_treeview(self, samples_list, is_pagination_load=False, current_page=1, total_pages=1):
         """Populates the Treeview widget with the given list of samples.
         Adjusts column visibility based on context (samples vs batches)."""
-        logging.info(f"Populating samples treeview. Pagination Load: {is_pagination_load}, Current Page: {current_page}, Total Pages: {total_pages}")
+        logging.info(
+            f"Populating samples treeview. Pagination Load: {is_pagination_load}, Current Page: {current_page}, Total Pages: {total_pages}")
         # Clear existing items for a fresh load
         self.tree.delete(*self.tree.get_children())
         # Reset DataFrame for new data
@@ -324,7 +351,7 @@ class UserLogic:
             for col in ["DocID", "DisplaySampleID", "Owner", "MaturationDate", "Status", "BatchID", "CreationDate"]:
                 if col not in df.columns:
                     df[col] = None
-            
+
             self.app.data = df
 
             # Insert data into the Treeview
@@ -370,8 +397,8 @@ class UserLogic:
                                          row.get('Status', ''),
                                          row.get('BatchID', 'N/A'),
                                          creation_date_str,
-                                         '', '', '', '')) # Empty values for hidden batch columns
-            
+                                         '', '', '', ''))  # Empty values for hidden batch columns
+
             self.status_label.config(text=f"Loaded {len(self.app.data)} samples. Page {current_page} of {total_pages}.")
             self.page_info_label.config(text=f"Page {current_page} of {total_pages}")
         else:
@@ -382,7 +409,7 @@ class UserLogic:
         # Update pagination button states based on current page and total pages
         self.prev_sample_page_btn.config(state=tk.NORMAL if current_page > 1 else tk.DISABLED)
         self.next_sample_page_btn.config(state=tk.NORMAL if current_page < total_pages else tk.DISABLED)
-        
+
         # Enable Edit and Delete Sample buttons when samples are displayed
         if self.edit_sample_button:
             self.edit_sample_button.config(state=tk.NORMAL)
@@ -413,7 +440,6 @@ class UserLogic:
         self.tree.column("Description", width=200, stretch=tk.YES)
         self.tree.column("SubmissionDate", width=120, anchor="center", stretch=tk.YES)
         self.tree.column("NumberOfSamples", width=100, anchor="center", stretch=tk.YES)
-
 
         if batches_list:
             df = pd.DataFrame(batches_list)
@@ -447,9 +473,9 @@ class UserLogic:
 
                 self.tree.insert("", tk.END,
                                  values=(row.get('DocID', ''),
-                                         '', '', '', '', # Empty values for hidden sample columns
+                                         '', '', '', '',  # Empty values for hidden sample columns
                                          row.get('BatchID', 'N/A'),
-                                         '', # Empty for sample CreationDate
+                                         '',  # Empty for sample CreationDate
                                          row.get('ProductName', 'N/A'),
                                          row.get('Description', 'N/A'),
                                          submission_date_str,
@@ -494,9 +520,9 @@ class UserLogic:
                 self.current_page_index -= 1
             self.load_samples_for_current_batch(reset=False)
         else:
-            messagebox.showwarning("Navigation Error", "Cannot navigate pages for the current view type. Please load all samples or my samples first.")
+            messagebox.showwarning("Navigation Error",
+                                   "Cannot navigate pages for the current view type. Please load all samples or my samples first.")
             logging.warning("Attempted page navigation on unsupported view type.")
-
 
     def load_samples_paginated(self, query_type, reset=True):
         """
@@ -508,7 +534,7 @@ class UserLogic:
         try:
             samples_ref = db.collection("samples")
             query = None
-            
+
             # If resetting, clear all relevant pagination states
             if reset:
                 self.current_page_index = 0
@@ -518,13 +544,14 @@ class UserLogic:
 
             if query_type == 'all_samples':
                 self.last_loaded_query_type = 'all_samples'
-                
+
                 query = samples_ref.order_by("creation_date").limit(self.samples_per_page)
                 # Apply cursor for pagination if not on the first page
                 if self.current_page_index > 0 and len(self.all_samples_page_cursors) > self.current_page_index - 1:
                     start_after_doc = self.all_samples_page_cursors[self.current_page_index - 1]
                     query = query.start_after(start_after_doc)
-                logging.info(f"Building query for all samples. Current page index: {self.current_page_index}, Cursor count: {len(self.all_samples_page_cursors)}")
+                logging.info(
+                    f"Building query for all samples. Current page index: {self.current_page_index}, Cursor count: {len(self.all_samples_page_cursors)}")
 
             elif query_type == 'my_samples':
                 # Check if user is logged in
@@ -537,16 +564,19 @@ class UserLogic:
                     self.next_sample_page_btn.config(state=tk.DISABLED)
                     self.page_info_label.config(text="Page 0 of 0")
                     return
-                
+
                 self.last_loaded_query_type = 'my_samples'
 
                 # Query samples submitted by the current user, ordered by creation date
-                query = samples_ref.where("submitted_by_employee_id", "==", self.app.current_user['employee_id']).order_by("creation_date").limit(self.samples_per_page)
+                query = samples_ref.where("submitted_by_employee_id", "==",
+                                          self.app.current_user['employee_id']).order_by("creation_date").limit(
+                    self.samples_per_page)
                 # Apply cursor for pagination if not on the first page
                 if self.current_page_index > 0 and len(self.my_samples_page_cursors) > self.current_page_index - 1:
                     start_after_doc = self.my_samples_page_cursors[self.current_page_index - 1]
                     query = query.start_after(start_after_doc)
-                logging.info(f"Building query for my samples (user: {self.app.current_user['employee_id']}). Current page index: {self.current_page_index}, Cursor count: {len(self.my_samples_page_cursors)}")
+                logging.info(
+                    f"Building query for my samples (user: {self.app.current_user['employee_id']}). Current page index: {self.current_page_index}, Cursor count: {len(self.my_samples_page_cursors)}")
             else:
                 logging.error(f"Invalid query_type passed to load_samples_paginated: {query_type}")
                 # Disable pagination buttons on invalid query type
@@ -567,12 +597,12 @@ class UserLogic:
                 if data.get('creation_date') and hasattr(data['creation_date'], 'to_datetime'):
                     data['creation_date'] = data['creation_date'].to_datetime()
                 samples_list.append(data)
-            
+
             # Determine total count for page info
             total_count = 0
             aggregate_query = db.collection("samples").count()
             aggregate_query_snapshot = aggregate_query.get()
-            
+
             if aggregate_query_snapshot:
                 try:
                     potential_result_object = aggregate_query_snapshot[0]
@@ -583,31 +613,34 @@ class UserLogic:
                     elif isinstance(potential_result_object, dict) and 'count' in potential_result_object:
                         total_count = potential_result_object.get('count', 0)
                     else:
-                        logging.error(f"Unexpected structure for aggregate result object (all_samples): {type(potential_result_object)}")
+                        logging.error(
+                            f"Unexpected structure for aggregate result object (all_samples): {type(potential_result_object)}")
                         total_count = 0
                 except IndexError:
                     logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds (all_samples).")
                     total_count = 0
                 except Exception as unexpected_e:
-                    logging.error(f"Unexpected error when getting total count for all samples: {unexpected_e}", exc_info=True)
+                    logging.error(f"Unexpected error when getting total count for all samples: {unexpected_e}",
+                                  exc_info=True)
                     total_count = 0
             else:
                 total_count = 0
             logging.info(f"Total count for all samples: {total_count}")
-            
+
             # Store cursor for the next page if a full page was fetched
             if docs and len(docs) == self.samples_per_page:
                 if len(self.all_samples_page_cursors) == self.current_page_index:
                     self.all_samples_page_cursors.append(docs[-1])
-                else: 
+                else:
                     self.all_samples_page_cursors[self.current_page_index] = docs[-1]
             elif not docs and self.current_page_index > 0:
                 logging.info("Reached end of 'all_samples' data during pagination.")
 
             elif query_type == 'my_samples':
-                aggregate_query = db.collection("samples").where("submitted_by_employee_id", "==", self.app.current_user['employee_id']).count()
+                aggregate_query = db.collection("samples").where("submitted_by_employee_id", "==",
+                                                                 self.app.current_user['employee_id']).count()
                 aggregate_query_snapshot = aggregate_query.get()
-                
+
                 if aggregate_query_snapshot:
                     try:
                         potential_result_object = aggregate_query_snapshot[0]
@@ -618,18 +651,20 @@ class UserLogic:
                         elif isinstance(potential_result_object, dict) and 'count' in potential_result_object:
                             total_count = potential_result_object.get('count', 0)
                         else:
-                            logging.error(f"Unexpected structure for aggregate result object (my_samples): {type(potential_result_object)}")
+                            logging.error(
+                                f"Unexpected structure for aggregate result object (my_samples): {type(potential_result_object)}")
                             total_count = 0
                     except IndexError:
                         logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds (my_samples).")
                         total_count = 0
                     except Exception as unexpected_e:
-                        logging.error(f"Unexpected error when getting total count for my samples: {unexpected_e}", exc_info=True)
+                        logging.error(f"Unexpected error when getting total count for my samples: {unexpected_e}",
+                                      exc_info=True)
                         total_count = 0
                 else:
                     total_count = 0
                 logging.info(f"Total count for my samples: {total_count}")
-                
+
                 # Store cursor for the next page if a full page was fetched
                 if docs and len(docs) == self.samples_per_page:
                     if len(self.my_samples_page_cursors) == self.current_page_index:
@@ -642,8 +677,9 @@ class UserLogic:
             # Calculate total pages based on fetched total count
             total_pages = (total_count + self.samples_per_page - 1) // self.samples_per_page if total_count > 0 else 1
             logging.info(f"Calculated total pages: {total_pages}")
-            
-            self.load_samples_to_treeview(samples_list, is_pagination_load=True, current_page=self.current_page_index + 1, total_pages=total_pages)
+
+            self.load_samples_to_treeview(samples_list, is_pagination_load=True,
+                                          current_page=self.current_page_index + 1, total_pages=total_pages)
 
         except Exception as e:
             logging.error(f"Failed to load samples paginated: {e}", exc_info=True)
@@ -653,7 +689,6 @@ class UserLogic:
             self.prev_sample_page_btn.config(state=tk.DISABLED)
             self.next_sample_page_btn.config(state=tk.DISABLED)
             self.page_info_label.config(text="Page 0 of 0")
-
 
     def load_all_batches_to_tree(self):
         """Loads all batches from Firestore and displays them in the Treeview."""
@@ -697,7 +732,8 @@ class UserLogic:
         try:
             # Check for current user and employee ID before proceeding with the query
             if not self.app.current_user or not self.app.current_user.get('employee_id'):
-                messagebox.showwarning("Warning", "User not logged in or employee ID not found. Cannot load my batches.")
+                messagebox.showwarning("Warning",
+                                       "User not logged in or employee ID not found. Cannot load my batches.")
                 self.status_label.config(text="Cannot load my batches: User not identified.")
                 logging.warning("Attempted to load 'my_batches' without a logged-in user or employee ID.")
                 self.load_batches_to_treeview([])
@@ -714,7 +750,8 @@ class UserLogic:
                     data['submission_date'] = data['submission_date'].to_datetime()
                 batches_list.append(data)
             self.load_batches_to_treeview(batches_list)
-            logging.info(f"Successfully loaded {len(batches_list)} my batches for user {self.app.current_user['employee_id']}.")
+            logging.info(
+                f"Successfully loaded {len(batches_list)} my batches for user {self.app.current_user['employee_id']}.")
         except Exception as e:
             logging.error(f"Failed to load my batches: {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to load my batches: {e}")
@@ -756,7 +793,6 @@ class UserLogic:
             messagebox.showerror("Error", f"Failed to load today's batches: {e}")
             self.status_label.config(text="Failed to load today's batches.")
 
-
     def open_excel_import_options_form(self):
         """Opens a Toplevel window to choose how to import Excel data (local, new batch, existing batch)."""
         logging.info("Opening Excel import options form.")
@@ -765,22 +801,24 @@ class UserLogic:
         import_options_form.geometry("480x400")
         import_options_form.grab_set()
         import_options_form.transient(self.root)
-        import_options_form.config(bg='#f0f0f0') # Set background
+        import_options_form.config(bg='#f0f0f0')  # Set background
 
         frame = ttk.Frame(import_options_form, padding=15, style='TFrame')
         frame.pack(expand=True, fill="both")
 
-        self.excel_import_choice = tk.StringVar(value="local") # Default to local import
-        
+        self.excel_import_choice = tk.StringVar(value="local")  # Default to local import
+
         # Radio buttons for import choices
         ttk.Radiobutton(frame, text="Import to Local Table (temporary)",
                         variable=self.excel_import_choice, value="local", style='TRadiobutton',
-                        command=self._toggle_excel_import_fields).grid(row=0, column=0, columnspan=2, sticky="w", pady=5)
-        
+                        command=self._toggle_excel_import_fields).grid(row=0, column=0, columnspan=2, sticky="w",
+                                                                       pady=5)
+
         ttk.Radiobutton(frame, text="Add to New Batch in Database",
                         variable=self.excel_import_choice, value="new_batch", style='TRadiobutton',
-                        command=self._toggle_excel_import_fields).grid(row=1, column=0, columnspan=2, sticky="w", pady=5)
-        
+                        command=self._toggle_excel_import_fields).grid(row=1, column=0, columnspan=2, sticky="w",
+                                                                       pady=5)
+
         ttk.Label(frame, text="  New Product Name:", style='TLabel').grid(row=2, column=0, sticky="e", pady=2, padx=5)
         self.excel_new_batch_product_name_entry = ttk.Entry(frame, width=35, state="disabled", style='TEntry')
         self.excel_new_batch_product_name_entry.grid(row=2, column=1, sticky="ew", pady=2, padx=5)
@@ -791,18 +829,19 @@ class UserLogic:
 
         ttk.Radiobutton(frame, text="Add to Existing Batch in Database",
                         variable=self.excel_import_choice, value="existing_batch", style='TRadiobutton',
-                        command=self._toggle_excel_import_fields).grid(row=4, column=0, columnspan=2, sticky="w", pady=5)
-        
+                        command=self._toggle_excel_import_fields).grid(row=4, column=0, columnspan=2, sticky="w",
+                                                                       pady=5)
+
         ttk.Label(frame, text="  Existing Batch ID:", style='TLabel').grid(row=5, column=0, sticky="e", pady=2, padx=5)
         self.excel_existing_batch_combobox = ttk.Combobox(frame, state="disabled", width=32, style='TCombobox')
         self.excel_existing_batch_combobox.grid(row=5, column=1, sticky="ew", pady=2, padx=5)
         self._load_existing_batches_into_combobox_for_excel_import(self.excel_existing_batch_combobox)
 
+        ttk.Button(frame, text="Select Excel File and Proceed",
+                   command=lambda: self._handle_excel_import_choice(import_options_form), style='Primary.TButton').grid(
+            row=6, column=0, columnspan=2, pady=20)
 
-        ttk.Button(frame, text="Select Excel File and Proceed", 
-                   command=lambda: self._handle_excel_import_choice(import_options_form), style='Primary.TButton').grid(row=6, column=0, columnspan=2, pady=20)
-        
-        self._toggle_excel_import_fields() # Set initial state of fields based on default radio button
+        self._toggle_excel_import_fields()  # Set initial state of fields based on default radio button
 
         import_options_form.protocol("WM_DELETE_WINDOW", import_options_form.destroy)
         logging.info("Excel import options form opened.")
@@ -819,7 +858,7 @@ class UserLogic:
         self.excel_new_batch_description_entry.delete(0, tk.END)
         self.excel_existing_batch_combobox.config(state="disabled")
         self.excel_existing_batch_combobox.set('')
-        self.excel_existing_batch_combobox['values'] = [] # Clear values when disabling
+        self.excel_existing_batch_combobox['values'] = []  # Clear values when disabling
 
         # Enable fields based on selected choice
         if choice == "new_batch":
@@ -827,7 +866,8 @@ class UserLogic:
             self.excel_new_batch_description_entry.config(state="normal")
         elif choice == "existing_batch":
             self.excel_existing_batch_combobox.config(state="readonly")
-            self._load_existing_batches_into_combobox_for_excel_import(self.excel_existing_batch_combobox) # Reload values for existing batches
+            self._load_existing_batches_into_combobox_for_excel_import(
+                self.excel_existing_batch_combobox)  # Reload values for existing batches
         logging.debug("Excel import fields toggled.")
 
     def _load_existing_batches_into_combobox_for_excel_import(self, target_combobox):
@@ -855,7 +895,7 @@ class UserLogic:
         logging.info("Handling Excel import choice.")
         filetypes = (("Excel files", "*.xlsx *.xls"), ("All files", "*.*"))
         filename = filedialog.askopenfilename(title="Open Excel file", filetypes=filetypes)
-        
+
         if not filename:
             logging.info("Excel file selection cancelled.")
             return
@@ -897,25 +937,27 @@ class UserLogic:
             logging.warning("Excel file missing 'sample_id' column.")
             return
         if 'owner' not in df.columns:
-            messagebox.showwarning("Missing Column", "Excel file should ideally contain an 'Owner' column. Defaulting to current user.")
+            messagebox.showwarning("Missing Column",
+                                   "Excel file should ideally contain an 'Owner' column. Defaulting to current user.")
             df['owner'] = self.app.current_user.get('username', 'N/A')
         if 'maturation_date' not in df.columns:
-            messagebox.showwarning("Missing Column", "Excel file should ideally contain a 'MaturationDate' column. Defaulting to None.")
+            messagebox.showwarning("Missing Column",
+                                   "Excel file should ideally contain a 'MaturationDate' column. Defaulting to None.")
             df['maturation_date'] = None
         if 'status' not in df.columns:
             df['status'] = SAMPLE_STATUS_OPTIONS[0]
             logging.warning("Excel file missing 'status' column. Defaulting to first status option.")
         if 'creation_date' not in df.columns:
-             df['creation_date'] = datetime.now()
+            df['creation_date'] = datetime.now()
         if 'submitted_by_employee_id' not in df.columns:
-             df['submitted_by_employee_id'] = self.app.current_user.get('employee_id')
-        
+            df['submitted_by_employee_id'] = self.app.current_user.get('employee_id')
+
         # Convert date columns to datetime objects, coercing errors
         for col in ['maturation_date', 'creation_date']:
             if col in df.columns:
                 df[col] = pd.to_datetime(df[col], errors='coerce')
                 df[col] = df[col].apply(lambda x: x.to_pydatetime() if pd.notna(x) else None)
-        
+
         choice = self.excel_import_choice.get()
         if choice == "local":
             self._import_excel_locally(df, filename, form_window)
@@ -926,7 +968,7 @@ class UserLogic:
         elif choice == "existing_batch":
             batch_id = self.excel_existing_batch_combobox.get().strip()
             self._add_excel_to_existing_batch_db(df, batch_id, form_window)
-        
+
     def _import_excel_locally(self, df, filename, form_window):
         """Imports data from a DataFrame into the application's local DataFrame and displays it."""
         logging.info("Importing Excel data locally.")
@@ -981,7 +1023,8 @@ class UserLogic:
             for index, row in df.iterrows():
                 # Check for duplicate sample_id for each row before adding
                 sample_id = row['sample_id']
-                existing_samples_with_display_id = db.collection("samples").where("sample_id", "==", sample_id).limit(1).get()
+                existing_samples_with_display_id = db.collection("samples").where("sample_id", "==", sample_id).limit(
+                    1).get()
                 if list(existing_samples_with_display_id):
                     logging.warning(f"Skipping duplicate sample ID '{sample_id}' from Excel import.")
                     continue
@@ -994,18 +1037,20 @@ class UserLogic:
                     "batch_id": new_batch_id,
                     "creation_date": row['creation_date'],
                     "submitted_by_employee_id": row['submitted_by_employee_id'],
-                    "last_updated_by_user_id": self.app.current_user.get('employee_id'), # New field
-                    "last_updated_timestamp": datetime.now() # New field
+                    "last_updated_by_user_id": self.app.current_user.get('employee_id'),  # New field
+                    "last_updated_timestamp": datetime.now()  # New field
                 }
                 sample_doc_ref = db.collection("samples").document()
                 batch_write.set(sample_doc_ref, sample_data)
                 samples_added_count += 1
-            
+
             # Increment the number of samples in the batch document
-            batch_write.update(batch_doc_ref, {"number_of_samples": firebase_admin.firestore.Increment(samples_added_count)})
+            batch_write.update(batch_doc_ref,
+                               {"number_of_samples": firebase_admin.firestore.Increment(samples_added_count)})
 
             batch_write.commit()
-            messagebox.showinfo("Success", f"Excel data successfully added to new batch '{new_batch_id}' with {samples_added_count} samples.")
+            messagebox.showinfo("Success",
+                                f"Excel data successfully added to new batch '{new_batch_id}' with {samples_added_count} samples.")
             logging.info(f"Excel data added to new batch '{new_batch_id}' with {samples_added_count} samples.")
 
             self.current_selected_batch_id = new_batch_id
@@ -1040,7 +1085,8 @@ class UserLogic:
             for index, row in df.iterrows():
                 # Check for duplicate sample_id before adding to existing batch
                 sample_id = row['sample_id']
-                existing_samples_with_display_id = db.collection("samples").where("sample_id", "==", sample_id).limit(1).get()
+                existing_samples_with_display_id = db.collection("samples").where("sample_id", "==", sample_id).limit(
+                    1).get()
                 if list(existing_samples_with_display_id):
                     logging.warning(f"Skipping duplicate sample ID '{sample_id}' from Excel import.")
                     continue
@@ -1053,18 +1099,20 @@ class UserLogic:
                     "batch_id": batch_id,
                     "creation_date": row['creation_date'],
                     "submitted_by_employee_id": row['submitted_by_employee_id'],
-                    "last_updated_by_user_id": self.app.current_user.get('employee_id'), # New field
-                    "last_updated_timestamp": datetime.now() # New field
+                    "last_updated_by_user_id": self.app.current_user.get('employee_id'),  # New field
+                    "last_updated_timestamp": datetime.now()  # New field
                 }
                 sample_doc_ref = db.collection("samples").document()
                 batch_write.set(sample_doc_ref, sample_data)
                 samples_added_count += 1
 
             # Increment the number of samples in the batch document
-            batch_write.update(batch_doc_ref, {"number_of_samples": firebase_admin.firestore.Increment(samples_added_count)})
+            batch_write.update(batch_doc_ref,
+                               {"number_of_samples": firebase_admin.firestore.Increment(samples_added_count)})
 
             batch_write.commit()
-            messagebox.showinfo("Success", f"Excel data successfully added to existing batch '{batch_id}' with {samples_added_count} new samples.")
+            messagebox.showinfo("Success",
+                                f"Excel data successfully added to existing batch '{batch_id}' with {samples_added_count} new samples.")
             logging.info(f"Excel data added to existing batch '{batch_id}' with {samples_added_count} new samples.")
 
             self.current_selected_batch_id = batch_id
@@ -1084,10 +1132,10 @@ class UserLogic:
             messagebox.showwarning("Warning", "No data to export.")
             logging.warning("No data found to export to Excel.")
             return
-        
+
         filetypes = (("Excel files", "*.xlsx"),)
         filename = filedialog.asksaveasfilename(defaultextension=".xlsx", filetypes=filetypes)
-        
+
         if filename:
             try:
                 df_to_prepare = self.app.data.copy()
@@ -1101,8 +1149,8 @@ class UserLogic:
                     'owner',
                     'maturation_date',
                     'creation_date',
-                    'last_updated_by_user_id', # Include new field for export if desired
-                    'last_updated_timestamp' # Include new field for export if desired
+                    'last_updated_by_user_id',  # Include new field for export if desired
+                    'last_updated_timestamp'  # Include new field for export if desired
                 }
 
                 column_rename_map = {}
@@ -1126,16 +1174,17 @@ class UserLogic:
                         column_rename_map[col] = 'creation_date'
                     elif col == 'submitted_by_employee_id':
                         column_rename_map[col] = 'submitted_by_employee_id'
-                    elif col == 'd_by_emp': # Handle typo from import side
-                         column_rename_map[col] = 'submitted_by_employee_id'
-                    elif col == 'last_updated_by_user_id': # Map the new internal field
+                    elif col == 'd_by_emp':  # Handle typo from import side
+                        column_rename_map[col] = 'submitted_by_employee_id'
+                    elif col == 'last_updated_by_user_id':  # Map the new internal field
                         column_rename_map[col] = 'last_updated_by_user_id'
-                    elif col == 'last_updated_timestamp': # Map the new internal field
+                    elif col == 'last_updated_timestamp':  # Map the new internal field
                         column_rename_map[col] = 'last_updated_timestamp'
                     elif col.lower().replace(' ', '_') in expected_import_headers:
-                         column_rename_map[col] = col.lower().replace(' ', '_')
+                        column_rename_map[col] = col.lower().replace(' ', '_')
                     else:
-                        logging.warning(f"Column '{col}' not explicitly mapped for export. Defaulting to lowercase_with_underscores.")
+                        logging.warning(
+                            f"Column '{col}' not explicitly mapped for export. Defaulting to lowercase_with_underscores.")
                         column_rename_map[col] = col.lower().replace(' ', '_')
 
                 df_to_prepare.rename(columns=column_rename_map, inplace=True, errors='ignore')
@@ -1149,10 +1198,10 @@ class UserLogic:
                     'owner',
                     'maturation_date',
                     'creation_date',
-                    'last_updated_by_user_id', # Add to final output order
-                    'last_updated_timestamp' # Add to final output order
+                    'last_updated_by_user_id',  # Add to final output order
+                    'last_updated_timestamp'  # Add to final output order
                 ]
-                
+
                 # Reindex the DataFrame to select only the desired columns and put them in the correct order.
                 df_for_export_final = df_to_prepare.reindex(columns=final_excel_output_order)
 
@@ -1193,7 +1242,6 @@ class UserLogic:
         self.status_label.config(text=f"Treeview refreshed. Displaying {len(self.app.data)} items.")
         logging.info(f"Tree refreshed. Displaying {len(self.app.data)} items.")
 
-
     def generate_barcode(self):
         """Generates a barcode for the selected sample ID (user-facing ID)."""
         logging.info("Attempting to generate barcode.")
@@ -1206,7 +1254,8 @@ class UserLogic:
         item = self.tree.item(selected[0])
         # Ensure the selected item is a sample, not a batch
         if self.last_loaded_query_type in ['batches', 'my_batches', 'todays_batches']:
-            messagebox.showwarning("Warning", "Please select a sample to generate a barcode (currently displaying batches).")
+            messagebox.showwarning("Warning",
+                                   "Please select a sample to generate a barcode (currently displaying batches).")
             logging.warning("Selected item is a batch, not a sample. Barcode generation aborted.")
             return
 
@@ -1243,18 +1292,19 @@ class UserLogic:
 
         # Ensure we are checking samples, not batches
         if self.last_loaded_query_type in ['batches', 'my_batches', 'todays_batches']:
-             messagebox.showwarning("Warning", "Notifications are for samples only. Please load samples first.")
-             logging.warning("Notification check attempted when batches are displayed.")
-             return
-        
+            messagebox.showwarning("Warning", "Notifications are for samples only. Please load samples first.")
+            logging.warning("Notification check attempted when batches are displayed.")
+            return
+
         # Additional check if 'MaturationDate' column exists
         if 'MaturationDate' not in self.app.data.columns:
-            messagebox.showwarning("Warning", "Maturation date information is not available in the current data set for notifications.")
+            messagebox.showwarning("Warning",
+                                   "Maturation date information is not available in the current data set for notifications.")
             logging.warning("Notification check attempted but 'MaturationDate' column is missing.")
             return
 
         # Make 'today' timezone-naive for consistent comparison
-        today = datetime.now().replace(tzinfo=None) 
+        today = datetime.now().replace(tzinfo=None)
 
         notifications = []
 
@@ -1276,7 +1326,8 @@ class UserLogic:
                     else:
                         mat_date_dt = datetime.strptime(str(mat_date).split(' ')[0], "%Y-%m-%d")
                 except (ValueError, TypeError):
-                    logging.warning(f"Could not parse maturation date for sample: {row.get('DisplaySampleID', 'N/A')}. Value: {mat_date}")
+                    logging.warning(
+                        f"Could not parse maturation date for sample: {row.get('DisplaySampleID', 'N/A')}. Value: {mat_date}")
                     continue
 
             # Ensure mat_date_dt is also timezone-naive before comparison
@@ -1286,7 +1337,8 @@ class UserLogic:
             if mat_date_dt:
                 delta = mat_date_dt - today
                 if 0 <= delta.days <= NOTIFICATION_DAYS_BEFORE:
-                    notifications.append(f"Sample {row.get('DisplaySampleID', 'N/A')} owned by {row.get('Owner', 'N/A')} matures on {mat_date_dt.strftime('%Y-%m-%d')}.")
+                    notifications.append(
+                        f"Sample {row.get('DisplaySampleID', 'N/A')} owned by {row.get('Owner', 'N/A')} matures on {mat_date_dt.strftime('%Y-%m-%d')}.")
 
         if notifications:
             messagebox.showinfo("Notifications", "\n".join(notifications))
@@ -1294,7 +1346,6 @@ class UserLogic:
         else:
             messagebox.showinfo("Notifications", f"No samples maturing within {NOTIFICATION_DAYS_BEFORE} days.")
             logging.info(f"No samples maturing within {NOTIFICATION_DAYS_BEFORE} days.")
-
 
     def open_batch_selection_screen(self):
         """Opens a Toplevel window for selecting an existing batch or creating a new one."""
@@ -1304,14 +1355,16 @@ class UserLogic:
         batch_selection_form.geometry("450x320")
         batch_selection_form.grab_set()
         batch_selection_form.transient(self.root)
-        batch_selection_form.config(bg='#f0f0f0') # Set background
+        batch_selection_form.config(bg='#f0f0f0')  # Set background
 
         frame = ttk.Frame(batch_selection_form, padding=10, style='TFrame')
         frame.pack(expand=True, fill="both")
 
         self.batch_choice = tk.StringVar(value="existing")
-        radio_existing = ttk.Radiobutton(frame, text="Select Existing Batch", variable=self.batch_choice, value="existing", style='TRadiobutton')
-        radio_new = ttk.Radiobutton(frame, text="Create New Batch", variable=self.batch_choice, value="new", style='TRadiobutton')
+        radio_existing = ttk.Radiobutton(frame, text="Select Existing Batch", variable=self.batch_choice,
+                                         value="existing", style='TRadiobutton')
+        radio_new = ttk.Radiobutton(frame, text="Create New Batch", variable=self.batch_choice, value="new",
+                                    style='TRadiobutton')
 
         radio_existing.grid(row=0, column=0, columnspan=2, sticky="w", pady=5)
         radio_new.grid(row=1, column=0, columnspan=2, sticky="w", pady=5)
@@ -1336,7 +1389,9 @@ class UserLogic:
         # Set initial state of fields based on default radio button
         self._toggle_batch_fields_on_selection(True)
 
-        ttk.Button(frame, text="Confirm Batch Selection", command=lambda: self._handle_batch_selection_confirmation(batch_selection_form), style='Primary.TButton').grid(row=5, column=0, columnspan=2, pady=20)
+        ttk.Button(frame, text="Confirm Batch Selection",
+                   command=lambda: self._handle_batch_selection_confirmation(batch_selection_form),
+                   style='Primary.TButton').grid(row=5, column=0, columnspan=2, pady=20)
         batch_selection_form.protocol("WM_DELETE_WINDOW", batch_selection_form.destroy)
         logging.info("Batch selection screen opened.")
 
@@ -1347,7 +1402,7 @@ class UserLogic:
             if self.existing_batch_combobox:
                 self.existing_batch_combobox.config(state="readonly" if is_existing_batch_selected else "disabled")
                 if not is_existing_batch_selected:
-                    self.existing_batch_combobox.set('') # Clear selection when disabled
+                    self.existing_batch_combobox.set('')  # Clear selection when disabled
         except Exception as e:
             logging.warning(f"Error configuring existing_batch_combobox: {e}")
 
@@ -1367,7 +1422,6 @@ class UserLogic:
         except Exception as e:
             logging.warning(f"Error configuring new_batch_description: {e}")
         logging.debug("Batch fields toggled.")
-
 
     def _load_existing_batches_into_combobox(self):
         """Loads batch IDs created by the current user from Firestore into the combobox."""
@@ -1406,11 +1460,12 @@ class UserLogic:
 
             # Generate a unique batch ID
             selected_batch_id = f"batch_{self.app.current_user['employee_id']}_{datetime.now().strftime('%Y%m%d')}"
-            
+
             # Check if generated ID already exists (collision is unlikely with timestamp but good practice)
             if db.collection("batches").document(selected_batch_id).get().exists:
                 messagebox.showerror("Error", "Generated Batch ID already exists. Please try again.")
-                logging.error(f"Generated batch ID '{selected_batch_id}' already exists. Retrying generation might be needed.")
+                logging.error(
+                    f"Generated batch ID '{selected_batch_id}' already exists. Retrying generation might be needed.")
                 return
 
             new_batch_data = {
@@ -1441,7 +1496,7 @@ class UserLogic:
                 messagebox.showerror("Error", f"Failed to create new batch: {e}")
                 return
 
-        else: # Existing batch selected
+        else:  # Existing batch selected
             selected_batch_id = self.existing_batch_combobox.get().strip()
             if not selected_batch_id:
                 messagebox.showerror("Error", "Please select an existing batch.")
@@ -1486,7 +1541,7 @@ class UserLogic:
             self.all_samples_page_cursors = []
             self.my_samples_page_cursors = []
             self.batch_samples_page_cursors = []
-        
+
         self.last_loaded_query_type = 'current_batch_samples'
 
         self.tree.delete(*self.tree.get_children())
@@ -1494,16 +1549,19 @@ class UserLogic:
         try:
             samples_ref = db.collection("samples")
             # Build query for the specific batch, ordered by creation_date
-            query = samples_ref.where("batch_id", "==", self.current_selected_batch_id).order_by("creation_date").limit(self.samples_per_page)
+            query = samples_ref.where("batch_id", "==", self.current_selected_batch_id).order_by("creation_date").limit(
+                self.samples_per_page)
 
             # Apply cursor for pagination if not on the first page
             if self.current_page_index > 0 and len(self.batch_samples_page_cursors) > self.current_page_index - 1:
                 start_after_doc = self.batch_samples_page_cursors[self.current_page_index - 1]
                 query = query.start_after(start_after_doc)
-            logging.info(f"Building query for batch samples ({self.current_selected_batch_id}). Current page index: {self.current_page_index}, Cursor count: {len(self.batch_samples_page_cursors)}")
+            logging.info(
+                f"Building query for batch samples ({self.current_selected_batch_id}). Current page index: {self.current_page_index}, Cursor count: {len(self.batch_samples_page_cursors)}")
 
             docs = list(query.stream())
-            logging.info(f"Fetched {len(docs)} documents for page {self.current_page_index + 1} of batch {self.current_selected_batch_id}.")
+            logging.info(
+                f"Fetched {len(docs)} documents for page {self.current_page_index + 1} of batch {self.current_selected_batch_id}.")
 
             for sample in docs:
                 data = sample.to_dict()
@@ -1519,7 +1577,7 @@ class UserLogic:
             total_count = 0
             aggregate_query = db.collection("samples").where("batch_id", "==", self.current_selected_batch_id).count()
             aggregate_query_snapshot = aggregate_query.get()
-            
+
             if aggregate_query_snapshot:
                 try:
                     potential_result_object = aggregate_query_snapshot[0]
@@ -1530,23 +1588,25 @@ class UserLogic:
                     elif isinstance(potential_result_object, dict) and 'count' in potential_result_object:
                         total_count = potential_result_object.get('count', 0)
                     else:
-                        logging.error(f"Unexpected structure for aggregate result object (batch samples): {type(potential_result_object)}")
+                        logging.error(
+                            f"Unexpected structure for aggregate result object (batch samples): {type(potential_result_object)}")
                         total_count = 0
                 except IndexError:
                     logging.warning("AggregateQuerySnapshot was empty or index 0 out of bounds (batch samples).")
                     total_count = 0
                 except Exception as unexpected_e:
-                    logging.error(f"Unexpected error when getting total count for batch samples: {unexpected_e}", exc_info=True)
+                    logging.error(f"Unexpected error when getting total count for batch samples: {unexpected_e}",
+                                  exc_info=True)
                     total_count = 0
             else:
                 total_count = 0
             logging.info(f"Total count for batch {self.current_selected_batch_id}: {total_count}")
-            
+
             # Store cursor for the next page if a full page was fetched
             if docs and len(docs) == self.samples_per_page:
                 if len(self.batch_samples_page_cursors) == self.current_page_index:
                     self.batch_samples_page_cursors.append(docs[-1])
-                else: 
+                else:
                     self.batch_samples_page_cursors[self.current_page_index] = docs[-1]
             elif not docs and self.current_page_index > 0:
                 logging.info("Reached end of data for current batch during pagination.")
@@ -1555,10 +1615,12 @@ class UserLogic:
             total_pages = (total_count + self.samples_per_page - 1) // self.samples_per_page if total_count > 0 else 1
             logging.info(f"Calculated total pages for batch {self.current_selected_batch_id}: {total_pages}")
 
-            self.load_samples_to_treeview(samples_list, is_pagination_load=True, current_page=self.current_page_index + 1, total_pages=total_pages)
+            self.load_samples_to_treeview(samples_list, is_pagination_load=True,
+                                          current_page=self.current_page_index + 1, total_pages=total_pages)
 
             if samples_list:
-                self.status_label.config(text=f"Loaded {len(self.app.data)} samples for Batch: {self.current_selected_batch_id}. Page {self.current_page_index + 1} of {total_pages}.")
+                self.status_label.config(
+                    text=f"Loaded {len(self.app.data)} samples for Batch: {self.current_selected_batch_id}. Page {self.current_page_index + 1} of {total_pages}.")
                 logging.info(f"Loaded {len(samples_list)} samples for batch {self.current_selected_batch_id}.")
             else:
                 self.status_label.config(text=f"No samples found for Batch: {self.current_selected_batch_id}")
@@ -1567,12 +1629,14 @@ class UserLogic:
             self.add_single_sample_button.config(state=tk.NORMAL)
             # Enable/disable pagination controls based on the current page for the batch
             self.prev_sample_page_btn.config(state=tk.NORMAL if self.current_page_index > 0 else tk.DISABLED)
-            self.next_sample_page_btn.config(state=tk.NORMAL if self.current_page_index < total_pages -1 else tk.DISABLED)
+            self.next_sample_page_btn.config(
+                state=tk.NORMAL if self.current_page_index < total_pages - 1 else tk.DISABLED)
             self.page_info_label.config(text=f"Page {self.current_page_index + 1} of {total_pages}")
 
 
         except Exception as e:
-            logging.error(f"Failed to load samples for batch {self.current_selected_batch_id} (paginated): {e}", exc_info=True)
+            logging.error(f"Failed to load samples for batch {self.current_selected_batch_id} (paginated): {e}",
+                          exc_info=True)
             messagebox.showerror("Error", f"Failed to load samples for batch: {e}")
             self.status_label.config(text="Failed to load samples for batch.")
             # Ensure pagination buttons are disabled on error
@@ -1584,7 +1648,8 @@ class UserLogic:
         """Opens a form to add a single new sample to the currently selected batch."""
         logging.info(f"Opening single sample form for batch: {self.current_selected_batch_id}")
         if not self.current_selected_batch_id:
-            messagebox.showwarning("Warning", "Please select or create a batch first using 'Add Sample to Batch' button.")
+            messagebox.showwarning("Warning",
+                                   "Please select or create a batch first using 'Add Sample to Batch' button.")
             logging.warning("open_single_sample_form called with no current_selected_batch_id.")
             return
 
@@ -1593,7 +1658,7 @@ class UserLogic:
         form.geometry("500x350")
         form.grab_set()
         form.transient(self.root)
-        form.config(bg='#f0f0f0') # Set background
+        form.config(bg='#f0f0f0')  # Set background
 
         frame = ttk.Frame(form, padding=10, style='TFrame')
         frame.pack(expand=True, fill="both")
@@ -1601,15 +1666,18 @@ class UserLogic:
         current_row = 0
 
         ttk.Label(frame, text="Batch ID:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
-        ttk.Label(frame, text=self.current_selected_batch_id, font=('Helvetica', 10, 'bold'), background='#f0f0f0', foreground='#333333').grid(row=current_row, column=1, sticky="w", pady=5, padx=5)
+        ttk.Label(frame, text=self.current_selected_batch_id, font=('Helvetica', 10, 'bold'), background='#f0f0f0',
+                  foreground='#333333').grid(row=current_row, column=1, sticky="w", pady=5, padx=5)
         current_row += 1
 
-        ttk.Label(frame, text="Sample ID (e.g., SMPL-001):", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(frame, text="Sample ID (e.g., SMPL-001):", style='TLabel').grid(row=current_row, column=0, sticky="e",
+                                                                                  pady=5, padx=5)
         self.entry_sample_display_id = ttk.Entry(frame, width=30, style='TEntry')
         self.entry_sample_display_id.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         current_row += 1
 
-        ttk.Label(frame, text="Sample Owner:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(frame, text="Sample Owner:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5,
+                                                                    padx=5)
         self.entry_owner_combobox = ttk.Combobox(frame, state="readonly", width=27, style='TCombobox')
         self.entry_owner_combobox.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         self._load_users_into_owner_combobox(self.entry_owner_combobox)
@@ -1618,20 +1686,24 @@ class UserLogic:
             self.entry_owner_combobox.set(self.app.current_user['username'])
         current_row += 1
 
-        ttk.Label(frame, text="Maturation Date (YYYY-MM-DD):", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
-        self.entry_maturation_date_entry = DateEntry(frame, width=28, background='darkblue', foreground='white', borderwidth=2,
-                                                     date_pattern='yyyy-mm-dd') # TkCalendar styling
+        ttk.Label(frame, text="Maturation Date (YYYY-MM-DD):", style='TLabel').grid(row=current_row, column=0,
+                                                                                    sticky="e", pady=5, padx=5)
+        self.entry_maturation_date_entry = DateEntry(frame, width=28, background='darkblue', foreground='white',
+                                                     borderwidth=2,
+                                                     date_pattern='yyyy-mm-dd')  # TkCalendar styling
         self.entry_maturation_date_entry.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
-        self.entry_maturation_date_entry.set_date(datetime.now().date()) # Default to today
+        self.entry_maturation_date_entry.set_date(datetime.now().date())  # Default to today
         current_row += 1
 
         ttk.Label(frame, text="Status:", style='TLabel').grid(row=current_row, column=0, padx=5, pady=5, sticky="e")
-        self.status_combobox = ttk.Combobox(frame, values=SAMPLE_STATUS_OPTIONS, state="readonly", width=27, style='TCombobox')
+        self.status_combobox = ttk.Combobox(frame, values=SAMPLE_STATUS_OPTIONS, state="readonly", width=27,
+                                            style='TCombobox')
         self.status_combobox.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
-        self.status_combobox.set(SAMPLE_STATUS_OPTIONS[0]) # Default to "pending approval"
+        self.status_combobox.set(SAMPLE_STATUS_OPTIONS[0])  # Default to "pending approval"
         current_row += 1
 
-        ttk.Button(frame, text="Add Sample to Batch", command=lambda: self._submit_single_sample(form), style='Success.TButton').grid(row=current_row, column=0, columnspan=2, pady=15)
+        ttk.Button(frame, text="Add Sample to Batch", command=lambda: self._submit_single_sample(form),
+                   style='Success.TButton').grid(row=current_row, column=0, columnspan=2, pady=15)
         form.protocol("WM_DELETE_WINDOW", form.destroy)
         logging.info("Single sample form opened.")
 
@@ -1649,7 +1721,6 @@ class UserLogic:
             messagebox.showerror("Error", f"Failed to load users for owner selection: {e}")
             target_combobox['values'] = []
 
-
     def _submit_single_sample(self, form_window):
         """Handles submission of a single new sample to the current batch."""
         logging.info("Submitting single sample.")
@@ -1659,11 +1730,11 @@ class UserLogic:
 
         # Validate Maturation Date
         mat_date_from_entry = self.entry_maturation_date_entry.get_date()
-        if not mat_date_from_entry or mat_date_from_entry == datetime(1,1,1).date():
+        if not mat_date_from_entry or mat_date_from_entry == datetime(1, 1, 1).date():
             messagebox.showerror("Error", "Maturation Date is required.")
             logging.warning("Maturation Date is missing for single sample submission.")
             return
-        
+
         mat_date_dt = datetime(mat_date_from_entry.year, mat_date_from_entry.month, mat_date_from_entry.day)
 
         # Maturation date validation: Must not be in the past
@@ -1672,7 +1743,6 @@ class UserLogic:
             messagebox.showerror("Validation Error", "Maturation Date cannot be in the past.")
             logging.warning(f"Maturation Date {mat_date_dt.strftime('%Y-%m-%d')} is in the past. Submission prevented.")
             return
-
 
         sample_created_date_dt = datetime.now()
 
@@ -1684,7 +1754,8 @@ class UserLogic:
 
         try:
             # Check for duplicate sample_id across the entire 'samples' collection
-            existing_samples_with_display_id = db.collection("samples").where("sample_id", "==", sample_display_id).limit(1).get()
+            existing_samples_with_display_id = db.collection("samples").where("sample_id", "==",
+                                                                              sample_display_id).limit(1).get()
             if list(existing_samples_with_display_id):
                 messagebox.showerror("Error", "Sample ID already exists in the database. Please use a unique ID.")
                 logging.error(f"Duplicate sample ID '{sample_display_id}' detected.")
@@ -1702,8 +1773,8 @@ class UserLogic:
             "batch_id": self.current_selected_batch_id,
             "submitted_by_employee_id": self.app.current_user.get('employee_id'),
             "maturation_date": mat_date_dt,
-            "last_updated_by_user_id": self.app.current_user.get('employee_id'), # Store user ID of creator
-            "last_updated_timestamp": datetime.now() # Store timestamp of creation
+            "last_updated_by_user_id": self.app.current_user.get('employee_id'),  # Store user ID of creator
+            "last_updated_timestamp": datetime.now()  # Store timestamp of creation
         }
         logging.debug(f"Sample data prepared: {sample_data}")
 
@@ -1718,8 +1789,10 @@ class UserLogic:
             batch_doc_ref = db.collection("batches").document(self.current_selected_batch_id)
             # Check if batch exists before attempting to update its sample count
             if not batch_doc_ref.get().exists:
-                messagebox.showwarning("Warning", f"Batch '{self.current_selected_batch_id}' not found. Sample added, but batch count not updated.")
-                logging.warning(f"Batch '{self.current_selected_batch_id}' not found when adding sample. Batch count not updated.")
+                messagebox.showwarning("Warning",
+                                       f"Batch '{self.current_selected_batch_id}' not found. Sample added, but batch count not updated.")
+                logging.warning(
+                    f"Batch '{self.current_selected_batch_id}' not found when adding sample. Batch count not updated.")
             else:
                 batch_write.update(batch_doc_ref, {"number_of_samples": firebase_admin.firestore.Increment(1)})
                 logging.info(f"Prepared to increment sample count for batch: {self.current_selected_batch_id}")
@@ -1727,7 +1800,8 @@ class UserLogic:
             batch_write.commit()
             logging.info("Firestore batch committed successfully.")
 
-            messagebox.showinfo("Success", f"Sample '{sample_display_id}' added successfully to Batch '{self.current_selected_batch_id}'.")
+            messagebox.showinfo("Success",
+                                f"Sample '{sample_display_id}' added successfully to Batch '{self.current_selected_batch_id}'.")
 
             # Reload samples for the current batch to refresh Treeview
             self.load_samples_for_current_batch(reset=False)
@@ -1759,15 +1833,18 @@ class UserLogic:
         display_sample_id = item['values'][1]
         batch_id = item['values'][5] if len(item['values']) > 5 else None
 
-        logging.info(f"Extracted values for deletion: DocID='{firestore_doc_id}', DisplaySampleID='{display_sample_id}', BatchID='{batch_id}'")
+        logging.info(
+            f"Extracted values for deletion: DocID='{firestore_doc_id}', DisplaySampleID='{display_sample_id}', BatchID='{batch_id}'")
 
         # Prevent deletion of locally imported samples that are not in DB
         if not firestore_doc_id or firestore_doc_id == 'N/A (Local)':
-            messagebox.showerror("Error", "Cannot delete a locally imported sample directly from the database. Please export and re-import if needed.")
+            messagebox.showerror("Error",
+                                 "Cannot delete a locally imported sample directly from the database. Please export and re-import if needed.")
             logging.error("Attempted to delete a local-only sample from the database.")
             return
 
-        confirm = messagebox.askyesno("Confirm Delete", f"Are you sure you want to delete sample '{display_sample_id}' from Batch '{batch_id}'?")
+        confirm = messagebox.askyesno("Confirm Delete",
+                                      f"Are you sure you want to delete sample '{display_sample_id}' from Batch '{batch_id}'?")
         if not confirm:
             logging.info("Delete sample aborted: User cancelled.")
             return
@@ -1789,9 +1866,11 @@ class UserLogic:
                     logging.info(f"Batch document '{batch_id}' exists. Preparing to decrement sample count.")
                     batch_write.update(batch_doc_ref, {"number_of_samples": firebase_admin.firestore.Increment(-1)})
                 else:
-                    logging.warning(f"Batch '{batch_id}' not found for sample '{display_sample_id}'. Cannot update sample count.")
+                    logging.warning(
+                        f"Batch '{batch_id}' not found for sample '{display_sample_id}'. Cannot update sample count.")
             else:
-                logging.warning(f"No valid Batch ID found for sample '{display_sample_id}'. Cannot update sample count.")
+                logging.warning(
+                    f"No valid Batch ID found for sample '{display_sample_id}'. Cannot update sample count.")
 
             batch_write.commit()
             logging.info("Firestore batch committed successfully.")
@@ -1804,7 +1883,7 @@ class UserLogic:
                 self.load_samples_paginated(self.last_loaded_query_type, reset=False)
             elif self.last_loaded_query_type == 'current_batch_samples' and self.current_selected_batch_id:
                 self.load_samples_for_current_batch(reset=False)
-            else: # Fallback to refresh all samples if context is unclear
+            else:  # Fallback to refresh all samples if context is unclear
                 self.load_samples_paginated(query_type='all_samples', reset=True)
 
             logging.info("Sample data reloaded and tree refreshed.")
@@ -1818,9 +1897,9 @@ class UserLogic:
 
         except Exception as e:
             logging.error(f"Error during delete_sample: {e}", exc_info=True)
-            messagebox.showerror("Error", f"Failed to delete sample: {e}\nSample might have been deleted, but an issue occurred during UI update or batch count adjustment.")
+            messagebox.showerror("Error",
+                                 f"Failed to delete sample: {e}\nSample might have been deleted, but an issue occurred during UI update or batch count adjustment.")
             logging.error("Delete_sample process completed with error.")
-
 
     def edit_sample(self):
         """Opens a form to edit details of a selected sample from Firestore."""
@@ -1837,7 +1916,8 @@ class UserLogic:
 
         # Prevent editing of locally imported samples
         if not firestore_doc_id or firestore_doc_id == 'N/A (Local)':
-            messagebox.showwarning("Warning", "Cannot edit locally imported samples directly. Please add them to a batch first.")
+            messagebox.showwarning("Warning",
+                                   "Cannot edit locally imported samples directly. Please add them to a batch first.")
             logging.warning("Attempted to edit a local-only sample.")
             return
 
@@ -1867,29 +1947,31 @@ class UserLogic:
         form.geometry("450x250")
         form.grab_set()
         form.transient(self.root)
-        form.config(bg='#f0f0f0') # Set background
+        form.config(bg='#f0f0f0')  # Set background
 
         current_row = 0
 
         ttk.Label(form, text="Sample ID:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
         entry_sample_display_id = ttk.Entry(form, style='TEntry')
         entry_sample_display_id.insert(0, row.get('sample_id', ''))
-        entry_sample_display_id.config(state='disabled') # Sample ID is usually not editable
+        entry_sample_display_id.config(state='disabled')  # Sample ID is usually not editable
         entry_sample_display_id.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         current_row += 1
 
-        ttk.Label(form, text="Sample Owner:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(form, text="Sample Owner:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5,
+                                                                   padx=5)
         edit_owner_combobox = ttk.Combobox(form, state="readonly", style='TCombobox')
         self._load_users_into_owner_combobox(edit_owner_combobox)
         edit_owner_combobox.set(row.get('owner', ''))
         edit_owner_combobox.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
         current_row += 1
 
-        ttk.Label(form, text="Maturation Date (YYYY-MM-DD):", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(form, text="Maturation Date (YYYY-MM-DD):", style='TLabel').grid(row=current_row, column=0,
+                                                                                   sticky="e", pady=5, padx=5)
         self.edit_mat_date_entry = DateEntry(form, width=28, background='darkblue', foreground='white', borderwidth=2,
-                                         date_pattern='yyyy-mm-dd') # TkCalendar styling
+                                             date_pattern='yyyy-mm-dd')  # TkCalendar styling
         self.edit_mat_date_entry.grid(row=current_row, column=1, sticky="ew", pady=5, padx=5)
-        
+
         # Set the current maturation date or a default empty date
         mat_date_for_entry = None
         if isinstance(row.get('maturation_date'), datetime):
@@ -1899,11 +1981,11 @@ class UserLogic:
                 mat_date_for_entry = row['maturation_date'].to_datetime()
             except Exception:
                 pass
-        
+
         if mat_date_for_entry:
             self.edit_mat_date_entry.set_date(mat_date_for_entry)
         else:
-            self.edit_mat_date_entry.set_date(datetime(1,1,1).date())
+            self.edit_mat_date_entry.set_date(datetime(1, 1, 1).date())
         current_row += 1
 
         ttk.Label(form, text="Status:", style='TLabel').grid(row=current_row, column=0, sticky="e", pady=5, padx=5)
@@ -1913,7 +1995,8 @@ class UserLogic:
         current_row += 1
 
         ttk.Button(form, text="Save Changes", command=lambda: self._submit_edit_sample(
-            form, firestore_doc_id, edit_owner_combobox.get(), self.edit_mat_date_entry.get_date(), status_combobox_edit.get()
+            form, firestore_doc_id, edit_owner_combobox.get(), self.edit_mat_date_entry.get_date(),
+            status_combobox_edit.get()
         ), style='Success.TButton').grid(row=current_row, column=0, columnspan=2, pady=15)
         form.protocol("WM_DELETE_WINDOW", form.destroy)
         logging.info("Edit sample form opened and populated.")
@@ -1928,29 +2011,29 @@ class UserLogic:
 
         # Maturation date validation: Must not be in the past
         today_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
-        if new_mat_date_dt and new_mat_date_dt < today_date.date(): # Compare date objects directly
+        if new_mat_date_dt and new_mat_date_dt < today_date.date():  # Compare date objects directly
             messagebox.showerror("Validation Error", "Maturation Date cannot be in the past.")
-            logging.warning(f"Maturation Date {new_mat_date_dt.strftime('%Y-%m-%d')} is in the past. Submission prevented.")
+            logging.warning(
+                f"Maturation Date {new_mat_date_dt.strftime('%Y-%m-%d')} is in the past. Submission prevented.")
             return
-        
+
         # Convert new_mat_date_dt to datetime object for Firestore
         mat_date_for_db = None
-        if new_mat_date_dt and new_mat_date_dt != datetime(1,1,1).date():
+        if new_mat_date_dt and new_mat_date_dt != datetime(1, 1, 1).date():
             mat_date_for_db = datetime(new_mat_date_dt.year, new_mat_date_dt.month, new_mat_date_dt.day)
         else:
             messagebox.showerror("Error", "Maturation Date is required.")
             logging.warning("Maturation Date is empty/default after edit, but is required.")
             return
 
-
         updated_data = {
             "owner": new_owner,
             "status": new_status,
             "maturation_date": mat_date_for_db,
-            "last_updated_by_user_id": self.app.current_user.get('employee_id'), # New field: user ID who last updated
-            "last_updated_timestamp": datetime.now() # New field: timestamp of last update
+            "last_updated_by_user_id": self.app.current_user.get('employee_id'),  # New field: user ID who last updated
+            "last_updated_timestamp": datetime.now()  # New field: timestamp of last update
         }
-        
+
         logging.debug(f"Updated data for sample {firestore_doc_id}: {updated_data}")
         try:
             db.collection("samples").document(firestore_doc_id).update(updated_data)
@@ -1962,7 +2045,7 @@ class UserLogic:
                 self.load_samples_paginated(self.last_loaded_query_type, reset=False)
             elif self.last_loaded_query_type == 'current_batch_samples' and self.current_selected_batch_id:
                 self.load_samples_for_current_batch(reset=False)
-            else: # Fallback to refresh all samples if context is unclear
+            else:  # Fallback to refresh all samples if context is unclear
                 self.load_samples_paginated(query_type='all_samples', reset=True)
 
             form_window.destroy()
@@ -1979,11 +2062,11 @@ class UserLogic:
         filter_form.geometry("450x500")
         filter_form.grab_set()
         filter_form.transient(self.root)
-        filter_form.config(bg='#f0f0f0') # Set background
+        filter_form.config(bg='#f0f0f0')  # Set background
 
         # Radio buttons to choose filtering mode
-        radio_frame = ttk.Frame(filter_form, style='TFrame') 
-        radio_frame.pack(fill="x", padx=10, pady=10) 
+        radio_frame = ttk.Frame(filter_form, style='TFrame')
+        radio_frame.pack(fill="x", padx=10, pady=10)
 
         ttk.Radiobutton(radio_frame, text="Filter Samples (by Sample/Batch/Product name)",
                         variable=self.filter_mode, value="samples", style='TRadiobutton',
@@ -1996,25 +2079,31 @@ class UserLogic:
                         variable=self.filter_mode, value="sample_search", style='TRadiobutton',
                         command=self._toggle_filter_frames).pack(anchor="w", pady=5)
 
-
         # Frames to hold specific filter options
         self.sample_filters_frame = ttk.Frame(filter_form, style='TFrame')
         self.batch_search_frame = ttk.Frame(filter_form, style='TFrame')
-        self.sample_search_frame = ttk.Frame(filter_form, style='TFrame') # New frame for sample search
+        self.sample_search_frame = ttk.Frame(filter_form, style='TFrame')  # New frame for sample search
 
         # Maturation Date Filter widgets within its own frame
         self.maturation_date_filter_frame = ttk.Frame(self.sample_filters_frame, style='TFrame')
         ttk.Checkbutton(self.sample_filters_frame, text="Enable Maturation Date Filter",
                         variable=self.filter_maturation_date_var, style='TCheckbutton',
-                        command=self._toggle_maturation_filter_state).grid(row=0, column=0, sticky="w", pady=5, padx=5, columnspan=2)
+                        command=self._toggle_maturation_filter_state).grid(row=0, column=0, sticky="w", pady=5, padx=5,
+                                                                           columnspan=2)
 
-        ttk.Label(self.maturation_date_filter_frame, text="From (YYYY-MM-DD):", style='TLabel').grid(row=0, column=0, sticky="e", pady=5, padx=5)
-        self.filter_start_date_entry = DateEntry(self.maturation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
+        ttk.Label(self.maturation_date_filter_frame, text="From (YYYY-MM-DD):", style='TLabel').grid(row=0, column=0,
+                                                                                                     sticky="e", pady=5,
+                                                                                                     padx=5)
+        self.filter_start_date_entry = DateEntry(self.maturation_date_filter_frame, width=28, background='darkblue',
+                                                 foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
         self.filter_start_date_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
         self.filter_start_date_entry.set_date(datetime.now().date())
 
-        ttk.Label(self.maturation_date_filter_frame, text="To (YYYY-MM-DD):", style='TLabel').grid(row=1, column=0, sticky="e", pady=5, padx=5)
-        self.filter_end_date_entry = DateEntry(self.maturation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
+        ttk.Label(self.maturation_date_filter_frame, text="To (YYYY-MM-DD):", style='TLabel').grid(row=1, column=0,
+                                                                                                   sticky="e", pady=5,
+                                                                                                   padx=5)
+        self.filter_end_date_entry = DateEntry(self.maturation_date_filter_frame, width=28, background='darkblue',
+                                               foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
         self.filter_end_date_entry.grid(row=1, column=1, sticky="ew", pady=5, padx=5)
         self.filter_end_date_entry.set_date(datetime.now().date())
 
@@ -2022,15 +2111,24 @@ class UserLogic:
         self.creation_date_filter_frame = ttk.Frame(self.sample_filters_frame, style='TFrame')
         ttk.Checkbutton(self.sample_filters_frame, text="Enable Creation Date Filter",
                         variable=self.filter_creation_date_var, style='TCheckbutton',
-                        command=self._toggle_creation_filter_state).grid(row=2, column=0, sticky="w", pady=5, padx=5, columnspan=2)
+                        command=self._toggle_creation_filter_state).grid(row=2, column=0, sticky="w", pady=5, padx=5,
+                                                                         columnspan=2)
 
-        ttk.Label(self.creation_date_filter_frame, text="From (YYYY-MM-DD):", style='TLabel').grid(row=0, column=0, sticky="e", pady=5, padx=5)
-        self.filter_creation_start_date_entry = DateEntry(self.creation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
+        ttk.Label(self.creation_date_filter_frame, text="From (YYYY-MM-DD):", style='TLabel').grid(row=0, column=0,
+                                                                                                   sticky="e", pady=5,
+                                                                                                   padx=5)
+        self.filter_creation_start_date_entry = DateEntry(self.creation_date_filter_frame, width=28,
+                                                          background='darkblue', foreground='white', borderwidth=2,
+                                                          date_pattern='yyyy-mm-dd')
         self.filter_creation_start_date_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
         self.filter_creation_start_date_entry.set_date(datetime.now().date())
 
-        ttk.Label(self.creation_date_filter_frame, text="To (YYYY-MM-DD):", style='TLabel').grid(row=1, column=0, sticky="e", pady=5, padx=5)
-        self.filter_creation_end_date_entry = DateEntry(self.creation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
+        ttk.Label(self.creation_date_filter_frame, text="To (YYYY-MM-DD):", style='TLabel').grid(row=1, column=0,
+                                                                                                 sticky="e", pady=5,
+                                                                                                 padx=5)
+        self.filter_creation_end_date_entry = DateEntry(self.creation_date_filter_frame, width=28,
+                                                        background='darkblue', foreground='white', borderwidth=2,
+                                                        date_pattern='yyyy-mm-dd')
         self.filter_creation_end_date_entry.grid(row=1, column=1, sticky="ew", pady=5, padx=5)
         self.filter_creation_end_date_entry.set_date(datetime.now().date())
 
@@ -2041,44 +2139,52 @@ class UserLogic:
         # Other filters always visible, positioned after date filter frames
         current_filter_row = 4
 
-        ttk.Label(self.sample_filters_frame, text="Sample ID (similar/contains):", style='TLabel').grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(self.sample_filters_frame, text="Sample ID (similar/contains):", style='TLabel').grid(
+            row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
         self.filter_sample_id_entry = ttk.Entry(self.sample_filters_frame, width=30, style='TEntry')
         self.filter_sample_id_entry.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
         current_filter_row += 1
 
-        ttk.Label(self.sample_filters_frame, text="Batch ID (similar/contains):", style='TLabel').grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(self.sample_filters_frame, text="Batch ID (similar/contains):", style='TLabel').grid(
+            row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
         self.filter_batch_id_entry = ttk.Entry(self.sample_filters_frame, width=30, style='TEntry')
         self.filter_batch_id_entry.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
         current_filter_row += 1
 
-        ttk.Label(self.sample_filters_frame, text="Product Name (similar/contains):", style='TLabel').grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(self.sample_filters_frame, text="Product Name (similar/contains):", style='TLabel').grid(
+            row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
         self.filter_product_name_entry = ttk.Entry(self.sample_filters_frame, width=30, style='TEntry')
         self.filter_product_name_entry.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
         current_filter_row += 1
 
-        ttk.Label(self.sample_filters_frame, text="Status:", style='TLabel').grid(row=current_filter_row, column=0, sticky="e", pady=5, padx=5)
-        self.filter_status_combobox = ttk.Combobox(self.sample_filters_frame, values=[""] + SAMPLE_STATUS_OPTIONS, state="readonly", width=27, style='TCombobox')
-        self.filter_status_combobox.set("") # Default to empty to show all statuses
+        ttk.Label(self.sample_filters_frame, text="Status:", style='TLabel').grid(row=current_filter_row, column=0,
+                                                                                  sticky="e", pady=5, padx=5)
+        self.filter_status_combobox = ttk.Combobox(self.sample_filters_frame, values=[""] + SAMPLE_STATUS_OPTIONS,
+                                                   state="readonly", width=27, style='TCombobox')
+        self.filter_status_combobox.set("")  # Default to empty to show all statuses
         self.filter_status_combobox.grid(row=current_filter_row, column=1, sticky="ew", pady=5, padx=5)
         current_filter_row += 1
 
         # Populate batch_search_frame
-        ttk.Label(self.batch_search_frame, text="Enter Batch ID:", style='TLabel').grid(row=0, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(self.batch_search_frame, text="Enter Batch ID:", style='TLabel').grid(row=0, column=0, sticky="e",
+                                                                                        pady=5, padx=5)
         self.find_batch_id_entry = ttk.Entry(self.batch_search_frame, width=30, style='TEntry')
         self.find_batch_id_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
 
         # Populate sample_search_frame
-        ttk.Label(self.sample_search_frame, text="Enter Sample ID:", style='TLabel').grid(row=0, column=0, sticky="e", pady=5, padx=5)
+        ttk.Label(self.sample_search_frame, text="Enter Sample ID:", style='TLabel').grid(row=0, column=0, sticky="e",
+                                                                                          pady=5, padx=5)
         self.find_sample_id_entry = ttk.Entry(self.sample_search_frame, width=30, style='TEntry')
         self.find_sample_id_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
-
 
         # Buttons common to both modes
         button_frame = ttk.Frame(filter_form, style='TFrame')
         button_frame.pack(fill="x", side="bottom", padx=10, pady=10)
 
-        ttk.Button(button_frame, text="Apply", command=lambda: self.apply_filters(filter_form), style='Success.TButton').pack(side=tk.LEFT, padx=5, pady=10)
-        ttk.Button(button_frame, text="Clear Filters", command=lambda: self.clear_filters(filter_form), style='Secondary.TButton').pack(side=tk.LEFT, padx=5, pady=10)
+        ttk.Button(button_frame, text="Apply", command=lambda: self.apply_filters(filter_form),
+                   style='Success.TButton').pack(side=tk.LEFT, padx=5, pady=10)
+        ttk.Button(button_frame, text="Clear Filters", command=lambda: self.clear_filters(filter_form),
+                   style='Secondary.TButton').pack(side=tk.LEFT, padx=5, pady=10)
 
         # Initial display of filter frames
         self._toggle_filter_frames()
@@ -2120,7 +2226,7 @@ class UserLogic:
         # Hide all frames first
         self.sample_filters_frame.pack_forget()
         self.batch_search_frame.pack_forget()
-        self.sample_search_frame.pack_forget() # Hide new sample search frame
+        self.sample_search_frame.pack_forget()  # Hide new sample search frame
 
         # Ensure date filter frames are hidden and their variables are reset when switching modes
         self.maturation_date_filter_frame.grid_forget()
@@ -2130,51 +2236,58 @@ class UserLogic:
 
         if self.filter_mode.get() == "samples":
             self.sample_filters_frame.pack(fill="both", expand=True, padx=10, pady=10)
-            self._toggle_maturation_filter_state() # Re-apply state
-            self._toggle_creation_filter_state() # Re-apply state
+            self._toggle_maturation_filter_state()  # Re-apply state
+            self._toggle_creation_filter_state()  # Re-apply state
             logging.info("Switched to Sample Filter mode.")
         elif self.filter_mode.get() == "batch_search":
             self.batch_search_frame.pack(fill="both", expand=True, padx=10, pady=10)
             logging.info("Switched to Batch Search mode.")
-        elif self.filter_mode.get() == "sample_search": # Handle new sample search mode
+        elif self.filter_mode.get() == "sample_search":  # Handle new sample search mode
             self.sample_search_frame.pack(fill="both", expand=True, padx=10, pady=10)
             logging.info("Switched to Sample Search mode.")
-
 
     def apply_filters(self, form_window):
         """Applies the filters based on the selected mode (sample filter, batch search, or sample search)."""
         logging.info(f"Apply Filters called. Mode: {self.filter_mode.get()}")
         if self.filter_mode.get() == "samples":
             filters = {}
-            
+
             # Process Maturation Date Filters
             if self.filter_maturation_date_var.get():
                 start_date_obj = self.filter_start_date_entry.get_date()
                 end_date_obj = self.filter_end_date_entry.get_date()
-                if start_date_obj and start_date_obj != datetime(1,1,1).date():
+                if start_date_obj and start_date_obj != datetime(1, 1, 1).date():
                     filters['start_date'] = datetime(start_date_obj.year, start_date_obj.month, start_date_obj.day)
-                if end_date_obj and end_date_obj != datetime(1,1,1).date():
-                    filters['end_date'] = datetime(end_date_obj.year, end_date_obj.month, end_date_obj.day, 23, 59, 59, 999999)
-                if filters.get('start_date') and filters.get('end_date') and filters['start_date'] > filters['end_date']:
+                if end_date_obj and end_date_obj != datetime(1, 1, 1).date():
+                    filters['end_date'] = datetime(end_date_obj.year, end_date_obj.month, end_date_obj.day, 23, 59, 59,
+                                                   999999)
+                if filters.get('start_date') and filters.get('end_date') and filters['start_date'] > filters[
+                    'end_date']:
                     messagebox.showerror("Error", "'Maturation Date From' cannot be after 'Maturation Date To'.")
                     logging.warning("Maturation date 'From' is after 'To' date.")
                     return
-            
+
             # Process Creation Date Filters
             if self.filter_creation_date_var.get():
                 creation_start_date_obj = self.filter_creation_start_date_entry.get_date()
                 creation_end_date_obj = self.filter_creation_end_date_entry.get_date()
-                if creation_start_date_obj and creation_start_date_obj != datetime(1,1,1).date():
-                    filters['creation_start_date'] = datetime(creation_start_date_obj.year, creation_start_date_obj.month, creation_start_date_obj.day)
-                if creation_end_date_obj and creation_end_date_obj != datetime(1,1,1).date():
-                    filters['creation_end_date'] = datetime(creation_end_date_obj.year, creation_end_date_obj.month, creation_end_date_obj.day, 23, 59, 59, 999999)
-                if filters.get('creation_start_date') and filters.get('creation_end_date') and filters['creation_start_date'] > filters['creation_end_date']:
+                if creation_start_date_obj and creation_start_date_obj != datetime(1, 1, 1).date():
+                    filters['creation_start_date'] = datetime(creation_start_date_obj.year,
+                                                              creation_start_date_obj.month,
+                                                              creation_start_date_obj.day)
+                if creation_end_date_obj and creation_end_date_obj != datetime(1, 1, 1).date():
+                    filters['creation_end_date'] = datetime(creation_end_date_obj.year, creation_end_date_obj.month,
+                                                            creation_end_date_obj.day, 23, 59, 59, 999999)
+                if filters.get('creation_start_date') and filters.get('creation_end_date') and filters[
+                    'creation_start_date'] > filters['creation_end_date']:
                     messagebox.showerror("Error", "'Creation Date From' cannot be after 'Creation Date To'.")
                     logging.warning("Creation date 'From' is after 'To' date.")
                     return
 
-            logging.info(f"Maturation Date Filters processed: Start={filters.get('start_date')}, End={filters.get('end_date')}")
-            logging.info(f"Creation Date Filters processed: Start={filters.get('creation_start_date')}, End={filters.get('creation_end_date')}")
+            logging.info(
+                f"Maturation Date Filters processed: Start={filters.get('start_date')}, End={filters.get('end_date')}")
+            logging.info(
+                f"Creation Date Filters processed: Start={filters.get('creation_start_date')}, End={filters.get('creation_end_date')}")
 
             # Get text-based filter values
             sample_id = self.filter_sample_id_entry.get().strip()
@@ -2190,7 +2303,7 @@ class UserLogic:
                 filters['product_name'] = product_name
             if status:
                 filters['status'] = status
-            
+
             logging.info(f"Applying sample filters: {filters}")
             self.load_all_user_samples_from_db_with_filters(filters)
             form_window.destroy()
@@ -2215,8 +2328,8 @@ class UserLogic:
             except Exception as e:
                 logging.error(f"Error retrieving batch details for '{batch_id_to_find}': {e}", exc_info=True)
                 messagebox.showerror("Error", f"Failed to retrieve batch details: {e}")
-        
-        elif self.filter_mode.get() == "sample_search": # New: Handle sample search mode
+
+        elif self.filter_mode.get() == "sample_search":  # New: Handle sample search mode
             sample_id_to_find = self.find_sample_id_entry.get().strip()
             logging.info(f"Searching for sample ID: {sample_id_to_find}")
             if not sample_id_to_find:
@@ -2228,10 +2341,10 @@ class UserLogic:
                 # Find sample by sample_id (which is a field, not the Firestore document ID)
                 sample_docs = db.collection("samples").where("sample_id", "==", sample_id_to_find).limit(1).get()
                 sample_doc = None
-                for doc in sample_docs: # Iterate over the results (should be at most one due to limit(1))
+                for doc in sample_docs:  # Iterate over the results (should be at most one due to limit(1))
                     sample_doc = doc
                     break
-                
+
                 if sample_doc and sample_doc.exists:
                     logging.info("Sample found. Displaying details.")
                     self._display_sample_details_window(sample_doc.to_dict())
@@ -2277,11 +2390,11 @@ class UserLogic:
                     query = query.where("creation_date", "<=", filters['creation_end_date'])
                     firestore_creation_date_filter_applied = True
                     logging.info("Applied Firestore creation_date range filter.")
-                
+
                 # Apply direct equality filter for status if present
                 if filters.get('status'):
                     query = query.where("status", "==", filters['status'])
-                
+
             samples = query.stream()
 
             for sample in samples:
@@ -2306,9 +2419,10 @@ class UserLogic:
                 # Filter by Sample ID (contains)
                 if filters.get('sample_id'):
                     if 'sample_id' in df.columns:
-                         df = df[df['sample_id'].astype(str).str.contains(filters['sample_id'], case=False, na=False)]
+                        df = df[df['sample_id'].astype(str).str.contains(filters['sample_id'], case=False, na=False)]
                     elif 'DisplaySampleID' in df.columns:
-                        df = df[df['DisplaySampleID'].astype(str).str.contains(filters['sample_id'], case=False, na=False)]
+                        df = df[
+                            df['DisplaySampleID'].astype(str).str.contains(filters['sample_id'], case=False, na=False)]
                     logging.debug(f"Filtered by sample_id, {len(df)} remaining.")
 
                 # Filter by Batch ID (contains)
@@ -2329,7 +2443,8 @@ class UserLogic:
                             batch_doc = db.collection("batches").document(b_id).get()
                             if batch_doc.exists:
                                 batch_product_names[b_id] = batch_doc.to_dict().get('product_name', '').lower()
-                    df = df[df['batch_id'].apply(lambda x: product_name_filter_val in batch_product_names.get(x, '') if pd.notna(x) else False)]
+                    df = df[df['batch_id'].apply(
+                        lambda x: product_name_filter_val in batch_product_names.get(x, '') if pd.notna(x) else False)]
                     logging.debug(f"Filtered by product_name, {len(df)} remaining.")
 
                 # Apply secondary date filters locally if not applied by Firestore
@@ -2337,21 +2452,21 @@ class UserLogic:
                     df = df[df['maturation_date'].apply(lambda x: x and filters['start_date'] <= x)]
                     df = df[df['maturation_date'].apply(lambda x: x and x <= filters['end_date'])]
                     logging.debug(f"Applied local maturation_date filter, {len(df)} remaining.")
-                
+
                 if 'creation_start_date' in filters and 'creation_end_date' in filters and not firestore_creation_date_filter_applied:
                     df = df[df['creation_date'].apply(lambda x: x and filters['creation_start_date'] <= x)]
                     df = df[df['creation_date'].apply(lambda x: x and x <= filters['creation_end_date'])]
                     logging.debug(f"Applied local creation_date filter, {len(df)} remaining.")
 
             self.load_samples_to_treeview(df.to_dict('records'))
-            
+
             if not df.empty:
                 self.status_label.config(text=f"Loaded {len(self.app.data)} samples from database matching filters.")
                 logging.info(f"Finished loading filtered samples. Displaying {len(self.app.data)} samples.")
             else:
                 self.status_label.config(text="No samples found in the database matching filters.")
                 logging.info("No samples found matching filters.")
-            
+
             self.current_selected_batch_id = None
             self.add_single_sample_button.config(state=tk.DISABLED)
 
@@ -2366,7 +2481,6 @@ class UserLogic:
             messagebox.showerror("Error", f"Failed to load samples from database: {e}")
             self.status_label.config("Failed to load samples from database.")
 
-
     def _display_batch_details_window(self, batch_data):
         """Displays batch details in a new window with copyable text."""
         logging.info(f"Displaying batch details for batch: {batch_data.get('batch_id', 'N/A')}")
@@ -2375,13 +2489,14 @@ class UserLogic:
         details_window.geometry("500x300")
         details_window.grab_set()
         details_window.transient(self.root)
-        details_window.config(bg='#f0f0f0') # Set background
+        details_window.config(bg='#f0f0f0')  # Set background
 
         text_frame = ttk.Frame(details_window, padding=10, style='TFrame')
         text_frame.pack(expand=True, fill="both")
 
         text_widget = tk.Text(text_frame, wrap='word', font=('Consolas', 10),
-                              bg='#ffffff', bd=0, highlightthickness=0, foreground='#333333') # White background for text
+                              bg='#ffffff', bd=0, highlightthickness=0,
+                              foreground='#333333')  # White background for text
         text_widget.pack(side=tk.LEFT, expand=True, fill="both")
 
         scrollbar = ttk.Scrollbar(text_frame, command=text_widget.yview)
@@ -2391,7 +2506,7 @@ class UserLogic:
         details_str = f"Batch ID: {batch_data.get('batch_id', 'N/A')}\n"
         details_str += f"Product Name: {batch_data.get('product_name', 'N/A')}\n"
         details_str += f"Description: {batch_data.get('description', 'N/A')}\n"
-        
+
         submission_date = batch_data.get('submission_date')
         if submission_date is not None:
             if hasattr(submission_date, 'to_datetime'):
@@ -2417,9 +2532,10 @@ class UserLogic:
         details_str += f"Number of Samples: {batch_data.get('number_of_samples', 0)}\n"
 
         text_widget.insert(tk.END, details_str)
-        text_widget.config(state='normal') # Allow selection and copying
+        text_widget.config(state='normal')  # Allow selection and copying
 
-        ttk.Button(details_window, text="Close", command=details_window.destroy, style='Secondary.TButton').pack(pady=10)
+        ttk.Button(details_window, text="Close", command=details_window.destroy, style='Secondary.TButton').pack(
+            pady=10)
         details_window.protocol("WM_DELETE_WINDOW", details_window.destroy)
         logging.info(f"Batch details window displayed for {batch_data.get('batch_id', 'N/A')}.")
 
@@ -2431,13 +2547,14 @@ class UserLogic:
         details_window.geometry("500x350")
         details_window.grab_set()
         details_window.transient(self.root)
-        details_window.config(bg='#f0f0f0') # Set background
+        details_window.config(bg='#f0f0f0')  # Set background
 
         text_frame = ttk.Frame(details_window, padding=10, style='TFrame')
         text_frame.pack(expand=True, fill="both")
 
         text_widget = tk.Text(text_frame, wrap='word', font=('Consolas', 10),
-                              bg='#ffffff', bd=0, highlightthickness=0, foreground='#333333') # White background for text
+                              bg='#ffffff', bd=0, highlightthickness=0,
+                              foreground='#333333')  # White background for text
         text_widget.pack(side=tk.LEFT, expand=True, fill="both")
 
         scrollbar = ttk.Scrollbar(text_frame, command=text_widget.yview)
@@ -2449,7 +2566,7 @@ class UserLogic:
         details_str += f"Status: {sample_data.get('status', 'N/A')}\n"
         details_str += f"Batch ID: {sample_data.get('batch_id', 'N/A')}\n"
         details_str += f"Submitted By (Employee ID): {sample_data.get('submitted_by_employee_id', 'N/A')}\n"
-        
+
         # Format Maturation Date
         maturation_date = sample_data.get('maturation_date')
         if maturation_date is not None:
@@ -2491,7 +2608,7 @@ class UserLogic:
         # Format Last Updated By and Timestamp
         last_updated_by = sample_data.get('last_updated_by_user_id', 'N/A')
         last_updated_timestamp = sample_data.get('last_updated_timestamp')
-        
+
         details_str += f"Last Updated By: {last_updated_by}\n"
         if last_updated_timestamp is not None:
             if hasattr(last_updated_timestamp, 'to_datetime'):
@@ -2500,7 +2617,8 @@ class UserLogic:
                 last_updated_timestamp_dt = last_updated_timestamp
             else:
                 try:
-                    last_updated_timestamp_dt = datetime.strptime(str(last_updated_timestamp).split(' ')[0], "%Y-%m-%d %H:%M:%S.%f")
+                    last_updated_timestamp_dt = datetime.strptime(str(last_updated_timestamp).split(' ')[0],
+                                                                  "%Y-%m-%d %H:%M:%S.%f")
                 except ValueError:
                     last_updated_timestamp_dt = None
             if last_updated_timestamp_dt:
@@ -2511,12 +2629,12 @@ class UserLogic:
             details_str += f"Last Updated On: N/A\n"
 
         text_widget.insert(tk.END, details_str)
-        text_widget.config(state='normal') # Allow selection and copying
+        text_widget.config(state='normal')  # Allow selection and copying
 
-        ttk.Button(details_window, text="Close", command=details_window.destroy, style='Secondary.TButton').pack(pady=10)
+        ttk.Button(details_window, text="Close", command=details_window.destroy, style='Secondary.TButton').pack(
+            pady=10)
         details_window.protocol("WM_DELETE_WINDOW", details_window.destroy)
         logging.info(f"Sample details window displayed for {sample_data.get('sample_id', 'N/A')}.")
-
 
     def clear_filters(self, form_window):
         """Clears all filter fields and reloads all samples."""
@@ -2542,10 +2660,9 @@ class UserLogic:
         elif self.filter_mode.get() == "batch_search" and self.find_batch_id_entry:
             self.find_batch_id_entry.delete(0, tk.END)
             logging.info("Batch search filter cleared.")
-        elif self.filter_mode.get() == "sample_search" and self.find_sample_id_entry: # Clear sample search field
+        elif self.filter_mode.get() == "sample_search" and self.find_sample_id_entry:  # Clear sample search field
             self.find_sample_id_entry.delete(0, tk.END)
             logging.info("Sample search filter cleared.")
-
 
         # Always reload all samples (paginated) and reset all pagination states after clearing filters
         self.load_samples_paginated(query_type='all_samples', reset=True)
@@ -2564,7 +2681,8 @@ class UserLogic:
         item = self.tree.item(selected[0])
         # Ensure the selected item is actually a batch based on `last_loaded_query_type`
         if self.last_loaded_query_type not in ['batches', 'my_batches', 'todays_batches']:
-            messagebox.showwarning("Warning", "Please select a batch to delete (currently displaying samples or unknown data type).")
+            messagebox.showwarning("Warning",
+                                   "Please select a batch to delete (currently displaying samples or unknown data type).")
             logging.warning("Selected item is not a batch. Delete batch aborted.")
             return
 
@@ -2600,7 +2718,8 @@ class UserLogic:
             batch_write.commit()
             logging.info("Firestore batch committed successfully (batch and samples deleted).")
 
-            messagebox.showinfo("Success", f"Batch '{batch_id_display}' and its {deleted_samples_count} associated samples deleted successfully.")
+            messagebox.showinfo("Success",
+                                f"Batch '{batch_id_display}' and its {deleted_samples_count} associated samples deleted successfully.")
             logging.info(f"Batch '{batch_id_display}' and its samples deleted.")
 
             # Refresh the Treeview to reflect the deletion
@@ -2612,13 +2731,12 @@ class UserLogic:
                 self.load_todays_batches_to_tree()
             else:
                 self.load_all_batches_to_tree()
-            
+
             if hasattr(self.app, 'admin_logic'):
                 self.app.admin_logic.load_batches()
-                
+
             logging.info("Batch data reloaded and tree refreshed after deletion.")
 
         except Exception as e:
             logging.error(f"Failed to delete batch '{batch_id_display}': {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to delete batch and its samples:\n{e}")
-
