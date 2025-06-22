@@ -104,8 +104,10 @@ class UserLogic:
 
         self.filter_mode = tk.StringVar(value="samples")
         self.find_batch_id_entry = None
+        self.find_sample_id_entry = None # New: Entry for finding sample details
         self.sample_filters_frame = None
         self.batch_search_frame = None
+        self.sample_search_frame = None # New: Frame for sample search
 
         self.maturation_date_filter_frame = None
         self.creation_date_filter_frame = None
@@ -817,6 +819,7 @@ class UserLogic:
         self.excel_new_batch_description_entry.delete(0, tk.END)
         self.excel_existing_batch_combobox.config(state="disabled")
         self.excel_existing_batch_combobox.set('')
+        self.excel_existing_batch_combobox['values'] = [] # Clear values when disabling
 
         # Enable fields based on selected choice
         if choice == "new_batch":
@@ -824,6 +827,7 @@ class UserLogic:
             self.excel_new_batch_description_entry.config(state="normal")
         elif choice == "existing_batch":
             self.excel_existing_batch_combobox.config(state="readonly")
+            self._load_existing_batches_into_combobox_for_excel_import(self.excel_existing_batch_combobox) # Reload values for existing batches
         logging.debug("Excel import fields toggled.")
 
     def _load_existing_batches_into_combobox_for_excel_import(self, target_combobox):
@@ -989,7 +993,9 @@ class UserLogic:
                     "status": row['status'],
                     "batch_id": new_batch_id,
                     "creation_date": row['creation_date'],
-                    "submitted_by_employee_id": row['submitted_by_employee_id']
+                    "submitted_by_employee_id": row['submitted_by_employee_id'],
+                    "last_updated_by_user_id": self.app.current_user.get('employee_id'), # New field
+                    "last_updated_timestamp": datetime.now() # New field
                 }
                 sample_doc_ref = db.collection("samples").document()
                 batch_write.set(sample_doc_ref, sample_data)
@@ -1046,7 +1052,9 @@ class UserLogic:
                     "status": row['status'],
                     "batch_id": batch_id,
                     "creation_date": row['creation_date'],
-                    "submitted_by_employee_id": row['submitted_by_employee_id']
+                    "submitted_by_employee_id": row['submitted_by_employee_id'],
+                    "last_updated_by_user_id": self.app.current_user.get('employee_id'), # New field
+                    "last_updated_timestamp": datetime.now() # New field
                 }
                 sample_doc_ref = db.collection("samples").document()
                 batch_write.set(sample_doc_ref, sample_data)
@@ -1092,7 +1100,9 @@ class UserLogic:
                     'sample_id',
                     'owner',
                     'maturation_date',
-                    'creation_date'
+                    'creation_date',
+                    'last_updated_by_user_id', # Include new field for export if desired
+                    'last_updated_timestamp' # Include new field for export if desired
                 }
 
                 column_rename_map = {}
@@ -1118,6 +1128,10 @@ class UserLogic:
                         column_rename_map[col] = 'submitted_by_employee_id'
                     elif col == 'd_by_emp': # Handle typo from import side
                          column_rename_map[col] = 'submitted_by_employee_id'
+                    elif col == 'last_updated_by_user_id': # Map the new internal field
+                        column_rename_map[col] = 'last_updated_by_user_id'
+                    elif col == 'last_updated_timestamp': # Map the new internal field
+                        column_rename_map[col] = 'last_updated_timestamp'
                     elif col.lower().replace(' ', '_') in expected_import_headers:
                          column_rename_map[col] = col.lower().replace(' ', '_')
                     else:
@@ -1134,7 +1148,9 @@ class UserLogic:
                     'sample_id',
                     'owner',
                     'maturation_date',
-                    'creation_date'
+                    'creation_date',
+                    'last_updated_by_user_id', # Add to final output order
+                    'last_updated_timestamp' # Add to final output order
                 ]
                 
                 # Reindex the DataFrame to select only the desired columns and put them in the correct order.
@@ -1647,7 +1663,16 @@ class UserLogic:
             messagebox.showerror("Error", "Maturation Date is required.")
             logging.warning("Maturation Date is missing for single sample submission.")
             return
+        
         mat_date_dt = datetime(mat_date_from_entry.year, mat_date_from_entry.month, mat_date_from_entry.day)
+
+        # Maturation date validation: Must not be in the past
+        today_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        if mat_date_dt < today_date:
+            messagebox.showerror("Validation Error", "Maturation Date cannot be in the past.")
+            logging.warning(f"Maturation Date {mat_date_dt.strftime('%Y-%m-%d')} is in the past. Submission prevented.")
+            return
+
 
         sample_created_date_dt = datetime.now()
 
@@ -1676,7 +1701,9 @@ class UserLogic:
             "status": sample_status,
             "batch_id": self.current_selected_batch_id,
             "submitted_by_employee_id": self.app.current_user.get('employee_id'),
-            "maturation_date": mat_date_dt
+            "maturation_date": mat_date_dt,
+            "last_updated_by_user_id": self.app.current_user.get('employee_id'), # Store user ID of creator
+            "last_updated_timestamp": datetime.now() # Store timestamp of creation
         }
         logging.debug(f"Sample data prepared: {sample_data}")
 
@@ -1899,19 +1926,31 @@ class UserLogic:
             logging.warning("Owner or Status missing for sample edit.")
             return
 
-        updated_data = {
-            "owner": new_owner,
-            "status": new_status
-        }
+        # Maturation date validation: Must not be in the past
+        today_date = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0)
+        if new_mat_date_dt and new_mat_date_dt < today_date.date(): # Compare date objects directly
+            messagebox.showerror("Validation Error", "Maturation Date cannot be in the past.")
+            logging.warning(f"Maturation Date {new_mat_date_dt.strftime('%Y-%m-%d')} is in the past. Submission prevented.")
+            return
         
-        # Maturation date is always updated and required
+        # Convert new_mat_date_dt to datetime object for Firestore
+        mat_date_for_db = None
         if new_mat_date_dt and new_mat_date_dt != datetime(1,1,1).date():
-            updated_data["maturation_date"] = datetime(new_mat_date_dt.year, new_mat_date_dt.month, new_mat_date_dt.day)
+            mat_date_for_db = datetime(new_mat_date_dt.year, new_mat_date_dt.month, new_mat_date_dt.day)
         else:
             messagebox.showerror("Error", "Maturation Date is required.")
             logging.warning("Maturation Date is empty/default after edit, but is required.")
             return
 
+
+        updated_data = {
+            "owner": new_owner,
+            "status": new_status,
+            "maturation_date": mat_date_for_db,
+            "last_updated_by_user_id": self.app.current_user.get('employee_id'), # New field: user ID who last updated
+            "last_updated_timestamp": datetime.now() # New field: timestamp of last update
+        }
+        
         logging.debug(f"Updated data for sample {firestore_doc_id}: {updated_data}")
         try:
             db.collection("samples").document(firestore_doc_id).update(updated_data)
@@ -1952,10 +1991,16 @@ class UserLogic:
         ttk.Radiobutton(radio_frame, text="Find Batch Details (by Batch ID)",
                         variable=self.filter_mode, value="batch_search", style='TRadiobutton',
                         command=self._toggle_filter_frames).pack(anchor="w", pady=5)
+        # New radio button for finding sample details
+        ttk.Radiobutton(radio_frame, text="Find Sample Details (by Sample ID)",
+                        variable=self.filter_mode, value="sample_search", style='TRadiobutton',
+                        command=self._toggle_filter_frames).pack(anchor="w", pady=5)
+
 
         # Frames to hold specific filter options
         self.sample_filters_frame = ttk.Frame(filter_form, style='TFrame')
         self.batch_search_frame = ttk.Frame(filter_form, style='TFrame')
+        self.sample_search_frame = ttk.Frame(filter_form, style='TFrame') # New frame for sample search
 
         # Maturation Date Filter widgets within its own frame
         self.maturation_date_filter_frame = ttk.Frame(self.sample_filters_frame, style='TFrame')
@@ -2022,6 +2067,12 @@ class UserLogic:
         self.find_batch_id_entry = ttk.Entry(self.batch_search_frame, width=30, style='TEntry')
         self.find_batch_id_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
 
+        # Populate sample_search_frame
+        ttk.Label(self.sample_search_frame, text="Enter Sample ID:", style='TLabel').grid(row=0, column=0, sticky="e", pady=5, padx=5)
+        self.find_sample_id_entry = ttk.Entry(self.sample_search_frame, width=30, style='TEntry')
+        self.find_sample_id_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
+
+
         # Buttons common to both modes
         button_frame = ttk.Frame(filter_form, style='TFrame')
         button_frame.pack(fill="x", side="bottom", padx=10, pady=10)
@@ -2066,25 +2117,32 @@ class UserLogic:
     def _toggle_filter_frames(self):
         """Toggles visibility of filter frames based on radio button selection."""
         logging.info(f"Toggling filter frames. Current mode: {self.filter_mode.get()}")
+        # Hide all frames first
+        self.sample_filters_frame.pack_forget()
+        self.batch_search_frame.pack_forget()
+        self.sample_search_frame.pack_forget() # Hide new sample search frame
+
+        # Ensure date filter frames are hidden and their variables are reset when switching modes
+        self.maturation_date_filter_frame.grid_forget()
+        self.creation_date_filter_frame.grid_forget()
+        self.filter_maturation_date_var.set(False)
+        self.filter_creation_date_var.set(False)
+
         if self.filter_mode.get() == "samples":
-            self.batch_search_frame.pack_forget()
-            self.sample_filters_frame.pack(fill="both", expand=True, padx=10, pady=10) # Added padx/pady here
-            # Re-apply states for date filter frames when switching back to samples mode
-            self._toggle_maturation_filter_state()
-            self._toggle_creation_filter_state()
+            self.sample_filters_frame.pack(fill="both", expand=True, padx=10, pady=10)
+            self._toggle_maturation_filter_state() # Re-apply state
+            self._toggle_creation_filter_state() # Re-apply state
             logging.info("Switched to Sample Filter mode.")
         elif self.filter_mode.get() == "batch_search":
-            self.sample_filters_frame.pack_forget()
-            # Ensure date filter frames are hidden and their variables are reset when switching to batch search mode
-            self.maturation_date_filter_frame.grid_forget()
-            self.creation_date_filter_frame.grid_forget()
-            self.filter_maturation_date_var.set(False)
-            self.filter_creation_date_var.set(False)
-            self.batch_search_frame.pack(fill="both", expand=True, padx=10, pady=10) # Added padx/pady here
+            self.batch_search_frame.pack(fill="both", expand=True, padx=10, pady=10)
             logging.info("Switched to Batch Search mode.")
+        elif self.filter_mode.get() == "sample_search": # Handle new sample search mode
+            self.sample_search_frame.pack(fill="both", expand=True, padx=10, pady=10)
+            logging.info("Switched to Sample Search mode.")
+
 
     def apply_filters(self, form_window):
-        """Applies the filters based on the selected mode (sample filter or batch search)."""
+        """Applies the filters based on the selected mode (sample filter, batch search, or sample search)."""
         logging.info(f"Apply Filters called. Mode: {self.filter_mode.get()}")
         if self.filter_mode.get() == "samples":
             filters = {}
@@ -2157,6 +2215,33 @@ class UserLogic:
             except Exception as e:
                 logging.error(f"Error retrieving batch details for '{batch_id_to_find}': {e}", exc_info=True)
                 messagebox.showerror("Error", f"Failed to retrieve batch details: {e}")
+        
+        elif self.filter_mode.get() == "sample_search": # New: Handle sample search mode
+            sample_id_to_find = self.find_sample_id_entry.get().strip()
+            logging.info(f"Searching for sample ID: {sample_id_to_find}")
+            if not sample_id_to_find:
+                messagebox.showerror("Error", "Please enter a Sample ID to search.")
+                logging.warning("No sample ID entered for sample search.")
+                return
+
+            try:
+                # Find sample by sample_id (which is a field, not the Firestore document ID)
+                sample_docs = db.collection("samples").where("sample_id", "==", sample_id_to_find).limit(1).get()
+                sample_doc = None
+                for doc in sample_docs: # Iterate over the results (should be at most one due to limit(1))
+                    sample_doc = doc
+                    break
+                
+                if sample_doc and sample_doc.exists:
+                    logging.info("Sample found. Displaying details.")
+                    self._display_sample_details_window(sample_doc.to_dict())
+                    form_window.destroy()
+                else:
+                    logging.info("Sample Not Found.")
+                    messagebox.showinfo("Sample Not Found", f"Sample with ID '{sample_id_to_find}' does not exist.")
+            except Exception as e:
+                logging.error(f"Error retrieving sample details for '{sample_id_to_find}': {e}", exc_info=True)
+                messagebox.showerror("Error", f"Failed to retrieve sample details: {e}")
 
     def load_all_user_samples_from_db_with_filters(self, filters=None):
         """
@@ -2207,6 +2292,9 @@ class UserLogic:
                     data['maturation_date'] = data['maturation_date'].to_datetime()
                 if data.get('creation_date') and hasattr(data['creation_date'], 'to_datetime'):
                     data['creation_date'] = data['creation_date'].to_datetime()
+                # Ensure last_updated_timestamp is converted for consistency, though not displayed
+                if data.get('last_updated_timestamp') and hasattr(data['last_updated_timestamp'], 'to_datetime'):
+                    data['last_updated_timestamp'] = data['last_updated_timestamp'].to_datetime()
 
                 samples_list.append(data)
             logging.info(f"Initial fetch for filtered samples returned {len(samples_list)} results.")
@@ -2329,11 +2417,106 @@ class UserLogic:
         details_str += f"Number of Samples: {batch_data.get('number_of_samples', 0)}\n"
 
         text_widget.insert(tk.END, details_str)
-        text_widget.config(state='disabled')
+        text_widget.config(state='normal') # Allow selection and copying
 
         ttk.Button(details_window, text="Close", command=details_window.destroy, style='Secondary.TButton').pack(pady=10)
         details_window.protocol("WM_DELETE_WINDOW", details_window.destroy)
         logging.info(f"Batch details window displayed for {batch_data.get('batch_id', 'N/A')}.")
+
+    def _display_sample_details_window(self, sample_data):
+        """Displays sample details in a new window with copyable text."""
+        logging.info(f"Displaying sample details for sample: {sample_data.get('sample_id', 'N/A')}")
+        details_window = tk.Toplevel(self.root)
+        details_window.title(f"Sample Details: {sample_data.get('sample_id', 'N/A')}")
+        details_window.geometry("500x350")
+        details_window.grab_set()
+        details_window.transient(self.root)
+        details_window.config(bg='#f0f0f0') # Set background
+
+        text_frame = ttk.Frame(details_window, padding=10, style='TFrame')
+        text_frame.pack(expand=True, fill="both")
+
+        text_widget = tk.Text(text_frame, wrap='word', font=('Consolas', 10),
+                              bg='#ffffff', bd=0, highlightthickness=0, foreground='#333333') # White background for text
+        text_widget.pack(side=tk.LEFT, expand=True, fill="both")
+
+        scrollbar = ttk.Scrollbar(text_frame, command=text_widget.yview)
+        scrollbar.pack(side=tk.RIGHT, fill='y')
+        text_widget.config(yscrollcommand=scrollbar.set)
+
+        details_str = f"Sample ID: {sample_data.get('sample_id', 'N/A')}\n"
+        details_str += f"Owner: {sample_data.get('owner', 'N/A')}\n"
+        details_str += f"Status: {sample_data.get('status', 'N/A')}\n"
+        details_str += f"Batch ID: {sample_data.get('batch_id', 'N/A')}\n"
+        details_str += f"Submitted By (Employee ID): {sample_data.get('submitted_by_employee_id', 'N/A')}\n"
+        
+        # Format Maturation Date
+        maturation_date = sample_data.get('maturation_date')
+        if maturation_date is not None:
+            if hasattr(maturation_date, 'to_datetime'):
+                maturation_date_dt = maturation_date.to_datetime()
+            elif isinstance(maturation_date, datetime):
+                maturation_date_dt = maturation_date
+            else:
+                try:
+                    maturation_date_dt = datetime.strptime(str(maturation_date).split(' ')[0], "%Y-%m-%d")
+                except ValueError:
+                    maturation_date_dt = None
+            if maturation_date_dt:
+                details_str += f"Maturation Date: {maturation_date_dt.strftime('%Y-%m-%d')}\n"
+            else:
+                details_str += f"Maturation Date: N/A\n"
+        else:
+            details_str += f"Maturation Date: N/A\n"
+
+        # Format Creation Date
+        creation_date = sample_data.get('creation_date')
+        if creation_date is not None:
+            if hasattr(creation_date, 'to_datetime'):
+                creation_date_dt = creation_date.to_datetime()
+            elif isinstance(creation_date, datetime):
+                creation_date_dt = creation_date
+            else:
+                try:
+                    creation_date_dt = datetime.strptime(str(creation_date).split(' ')[0], "%Y-%m-%d")
+                except ValueError:
+                    creation_date_dt = None
+            if creation_date_dt:
+                details_str += f"Creation Date: {creation_date_dt.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            else:
+                details_str += f"Creation Date: N/A\n"
+        else:
+            details_str += f"Creation Date: N/A\n"
+
+        # Format Last Updated By and Timestamp
+        last_updated_by = sample_data.get('last_updated_by_user_id', 'N/A')
+        last_updated_timestamp = sample_data.get('last_updated_timestamp')
+        
+        details_str += f"Last Updated By: {last_updated_by}\n"
+        if last_updated_timestamp is not None:
+            if hasattr(last_updated_timestamp, 'to_datetime'):
+                last_updated_timestamp_dt = last_updated_timestamp.to_datetime()
+            elif isinstance(last_updated_timestamp, datetime):
+                last_updated_timestamp_dt = last_updated_timestamp
+            else:
+                try:
+                    last_updated_timestamp_dt = datetime.strptime(str(last_updated_timestamp).split(' ')[0], "%Y-%m-%d %H:%M:%S.%f")
+                except ValueError:
+                    last_updated_timestamp_dt = None
+            if last_updated_timestamp_dt:
+                details_str += f"Last Updated On: {last_updated_timestamp_dt.strftime('%Y-%m-%d %H:%M:%S')}\n"
+            else:
+                details_str += f"Last Updated On: N/A\n"
+        else:
+            details_str += f"Last Updated On: N/A\n"
+
+        text_widget.insert(tk.END, details_str)
+        text_widget.config(state='normal') # Allow selection and copying
+
+        ttk.Button(details_window, text="Close", command=details_window.destroy, style='Secondary.TButton').pack(pady=10)
+        details_window.protocol("WM_DELETE_WINDOW", details_window.destroy)
+        logging.info(f"Sample details window displayed for {sample_data.get('sample_id', 'N/A')}.")
+
 
     def clear_filters(self, form_window):
         """Clears all filter fields and reloads all samples."""
@@ -2359,6 +2542,10 @@ class UserLogic:
         elif self.filter_mode.get() == "batch_search" and self.find_batch_id_entry:
             self.find_batch_id_entry.delete(0, tk.END)
             logging.info("Batch search filter cleared.")
+        elif self.filter_mode.get() == "sample_search" and self.find_sample_id_entry: # Clear sample search field
+            self.find_sample_id_entry.delete(0, tk.END)
+            logging.info("Sample search filter cleared.")
+
 
         # Always reload all samples (paginated) and reset all pagination states after clearing filters
         self.load_samples_paginated(query_type='all_samples', reset=True)
@@ -2434,3 +2621,4 @@ class UserLogic:
         except Exception as e:
             logging.error(f"Failed to delete batch '{batch_id_display}': {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to delete batch and its samples:\n{e}")
+
