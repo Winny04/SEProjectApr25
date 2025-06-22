@@ -81,6 +81,8 @@ class TesterLogic:
     def filter_samples_by_maturation_date(self):
         """Filters and displays samples based on the provided maturation date range."""
         self.tester_tree.delete(*self.tester_tree.get_children())
+        self.tester_tree.tag_configure('urgent', background='khaki')  # Red for within 3 days
+        self.tester_tree.tag_configure('today', background='salmon')
         start_date_str = self.tester_mat_date_start_entry.get().strip()
         end_date_str = self.tester_mat_date_end_entry.get().strip()
 
@@ -138,6 +140,18 @@ class TesterLogic:
                                     u.to_dict().get("email")]
                 test_team_email = ", ".join(test_team_emails) if test_team_emails else "N/A"
 
+                days_left = -1
+                try:
+                    maturation_date = datetime.strptime(maturation_date_str, "%Y-%m-%d")
+                    days_left = (maturation_date.date() - datetime.today().date()).days
+                except:
+                    pass
+                tags = ()
+                if days_left == 0:
+                    tags = ('today',)
+                elif 0 < days_left <= 3:
+                    tags = ('urgent',)
+
                 self.tester_tree.insert("", "end", iid=sample.id,
                                         values=(data.get("sample_id", ""),
                                                 data.get("owner", ""),
@@ -145,7 +159,7 @@ class TesterLogic:
                                                 data.get("status", "pending"),
                                                 data.get("batch_id", ""),
                                                 product_owner_email,
-                                                test_team_email))
+                                                test_team_email), tags=tags)
             messagebox.showinfo("Filter Complete", "Samples filtered successfully.")
         except Exception as e:
             messagebox.showerror("Error", f"Failed to filter samples: {e}")
