@@ -215,6 +215,7 @@ class AuthManager:
         email_entry.grid(row=2, column=1, sticky="ew", pady=5)
         if user_data:
             email_entry.insert(0, user_data.get("email", ""))
+            email_entry.config(state='disabled')
 
         ttk.Label(frame, text="Password:").grid(row=3, column=0, sticky="e", pady=5)
         password_entry = ttk.Entry(frame, width=30, show="*")
@@ -227,6 +228,7 @@ class AuthManager:
         role_combobox.grid(row=4, column=1, sticky="ew", pady=5)
         if user_data:
             role_combobox.set(user_data.get("role", "user"))
+            role_combobox.config(state='disabled')
         else:
             role_combobox.current(0)
 
