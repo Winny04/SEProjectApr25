@@ -16,8 +16,8 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 # --- End Logging Setup ---
+
 class UserLogic:
     def __init__(self, root, app_instance):
         self.root = root
@@ -2740,3 +2740,4 @@ class UserLogic:
         except Exception as e:
             logging.error(f"Failed to delete batch '{batch_id_display}': {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to delete batch and its samples:\n{e}")
+
