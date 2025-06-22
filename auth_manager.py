@@ -18,25 +18,76 @@ class AuthManager:
         self.signup_confirm_password_entry = None
         self.signup_role = None
 
+        # Initialize ttk Style for modern look
+        self.style = ttk.Style()
+        self.style.theme_use('clam')  # Or 'alt', 'vista', 'xpnative'
+
+        # Configure general styles for a cleaner look
+        self.style.configure('TFrame', background='#e0e0e0', relief='flat')
+        self.style.configure('TLabel', font=('Helvetica Neue', 11), background='#e0e0e0', foreground='#333333')
+        self.style.configure('TEntry', font=('Helvetica Neue', 11), padding=5)
+        self.style.map('TEntry', fieldbackground=[('focus', '#ffffff'), ('!focus', '#f0f0f0')]) # Lighter background
+
+        # Accent button style
+        self.style.configure('Accent.TButton',
+                             font=('Helvetica Neue', 11, 'bold'),
+                             background='#4CAF50',  # Green
+                             foreground='white',
+                             relief='flat',
+                             padding=(10, 5))
+        self.style.map('Accent.TButton',
+                       background=[('active', '#45a049')],
+                       foreground=[('active', 'white')])
+
+        # Secondary button style
+        self.style.configure('TButton',
+                             font=('Helvetica Neue', 11),
+                             background='#007bff',  # Blue
+                             foreground='white',
+                             relief='flat',
+                             padding=(10, 5))
+        self.style.map('TButton',
+                       background=[('active', '#0056b3')],
+                       foreground=[('active', 'white')])
+
+
     def login_screen(self):
-        """Displays the login screen for users."""
+        """Displays the login screen for users with a modernized design and app title."""
         self.app.clear_root()
-        frame = ttk.Frame(self.root, padding=40)
-        frame.pack(expand=True)
 
-        frame.columnconfigure(0, weight=1)
-        frame.columnconfigure(1, weight=1)
+        # Main frame with padding and background
+        main_frame = ttk.Frame(self.root, padding="40 20 40 40", style='TFrame')
+        main_frame.pack(expand=True, fill='both')
 
-        ttk.Label(frame, text="Username:", font=("Helvetica", 12)).grid(row=0, column=0, sticky="e", pady=5, padx=5)
-        self.username_entry = ttk.Entry(frame, width=40, font=("Helvetica", 12))
-        self.username_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
+        # Center the content
+        main_frame.grid_rowconfigure(0, weight=1)
+        main_frame.grid_rowconfigure(4, weight=1) # To push content to center vertically
+        main_frame.grid_columnconfigure(0, weight=1)
+        main_frame.grid_columnconfigure(2, weight=1) # To push content to center horizontally
 
-        ttk.Label(frame, text="Password:", font=("Helvetica", 12)).grid(row=1, column=0, sticky="e", pady=5, padx=5)
-        self.password_entry = ttk.Entry(frame, width=40, show="*", font=("Helvetica", 12))
-        self.password_entry.grid(row=1, column=1, sticky="ew", pady=5, padx=5)
+        # Inner frame for form elements
+        form_frame = ttk.Frame(main_frame, padding=30, relief='solid', borderwidth=1, style='TFrame')
+        form_frame.grid(row=1, column=1, sticky='nsew', padx=20, pady=20)
+        form_frame.columnconfigure(0, weight=1)
+        form_frame.columnconfigure(1, weight=2)
 
-        ttk.Button(frame, text="Login", command=self.handle_login, style="Accent.TButton").grid(row=2, column=0, columnspan=2, pady=15)
-        ttk.Button(frame, text="Sign Up", command=self.signup_screen).grid(row=3, column=0, columnspan=2)
+        # App Title
+        ttk.Label(form_frame, text="Shelf-Life Study Management System ", font=("Helvetica Neue", 18, "bold"),
+                  background="#ffffff", foreground='#2c3e50').grid(row=0, column=0, columnspan=2, pady=(0, 25))
+
+        # Login form fields
+        ttk.Label(form_frame, text="Username:", font=("Helvetica Neue", 11)).grid(row=1, column=0, sticky="w", pady=5, padx=5)
+        self.username_entry = ttk.Entry(form_frame, width=40, font=("Helvetica Neue", 11))
+        self.username_entry.grid(row=1, column=1, sticky="ew", pady=5, padx=5)
+
+        ttk.Label(form_frame, text="Password:", font=("Helvetica Neue", 11)).grid(row=2, column=0, sticky="w", pady=5, padx=5)
+        self.password_entry = ttk.Entry(form_frame, width=40, show="*", font=("Helvetica Neue", 11))
+        self.password_entry.grid(row=2, column=1, sticky="ew", pady=5, padx=5)
+
+        # Buttons
+        ttk.Button(form_frame, text="Login", command=self.handle_login, style="Accent.TButton").grid(row=3, column=0, columnspan=2, pady=15, sticky='ew', padx=5)
+        ttk.Button(form_frame, text="Sign Up", command=self.signup_screen).grid(row=4, column=0, columnspan=2, sticky='ew', padx=5)
+
 
     def handle_login(self):
         """Handles user login authentication against Firestore."""
@@ -215,7 +266,6 @@ class AuthManager:
         email_entry.grid(row=2, column=1, sticky="ew", pady=5)
         if user_data:
             email_entry.insert(0, user_data.get("email", ""))
-            email_entry.config(state='disabled')
 
         ttk.Label(frame, text="Password:").grid(row=3, column=0, sticky="e", pady=5)
         password_entry = ttk.Entry(frame, width=30, show="*")
@@ -228,7 +278,6 @@ class AuthManager:
         role_combobox.grid(row=4, column=1, sticky="ew", pady=5)
         if user_data:
             role_combobox.set(user_data.get("role", "user"))
-            role_combobox.config(state='disabled')
         else:
             role_combobox.current(0)
 
