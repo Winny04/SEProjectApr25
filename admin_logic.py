@@ -716,6 +716,12 @@ class AdminLogic:
 
     def export_user_batches(self):
         """Exports approved batches and their associated samples to an Excel file."""
+        # Add confirmation dialog here
+        confirm = messagebox.askyesno("Confirm Export",
+                                      "Are you sure you want to export all approved batch data to Excel?")
+        if not confirm:
+            return  # User cancelled the export
+            
         logging.info("Attempting to export approved batches and samples to Excel.")
         approved_batches_data = []
         batches_ref = db.collection("batches")
