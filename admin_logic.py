@@ -6,11 +6,11 @@ from datetime import datetime
 import os
 from firebase_setup import db
 import firebase_admin
-import logging  # Import logging module for better debugging
 
-# Configure logging (optional, but good practice)
+# --- Logging Setup ---
+import logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
-
+# --- End Logging Setup ---
 
 class AdminLogic:
     def __init__(self, root, app_instance):
@@ -18,8 +18,23 @@ class AdminLogic:
         self.app = app_instance
         self.users_tree = None
         self.batches_tree = None
-        # self.approved_batches_tree = None # Removed this as it's no longer a separate treeview for approved batches
         self.batch_filter_var = None  # Variable to hold the selected batch filter (All, Pending, Approved)
+
+        style = ttk.Style()
+        style.theme_use('clam')  # Better default look
+
+        # Button styles
+        style.configure("Green.TButton", background="#2ecc71", foreground="white", font=("Segoe UI", 10, "bold"))
+        style.map("Green.TButton", background=[("active", "#27ae60")])
+
+        style.configure("Yellow.TButton", background="#f1c40f", foreground="black", font=("Segoe UI", 10, "bold"))
+        style.map("Yellow.TButton", background=[("active", "#f39c12")])
+
+        style.configure("Orange.TButton", background="#e67e22", foreground="white", font=("Segoe UI", 10, "bold"))
+        style.map("Orange.TButton", background=[("active", "#d35400")])
+
+        style.configure("View.TButton", background="#3498db", foreground="white", font=("Segoe UI", 10, "bold"))
+        style.map("View.TButton", background=[("active", "#2980b9")])
 
     def admin_dashboard(self):
         """Displays the admin dashboard with user and batch management."""
@@ -32,16 +47,14 @@ class AdminLogic:
         top_frame.pack(fill="x", padx=10, pady=10)
 
         ttk.Button(top_frame, text="Logout", command=self.app.logout).pack(side="right")
-        ttk.Label(top_frame, text=f"Welcome, Admin {self.app.current_user.get('username')}!",
-                  font=("Helvetica", 16)).pack(side="left", expand=True)
 
         # Main content frame to hold sidebar and central content
         main_content_frame = ttk.Frame(self.root)
         main_content_frame.pack(expand=True, fill="both", padx=10, pady=10)
 
         # Sidebar Frame
-        sidebar_frame = ttk.Frame(main_content_frame, width=180, relief="raised", borderwidth=1)
-        sidebar_frame.pack(side="left", fill="y", padx=(0, 10))
+        sidebar_frame = ttk.Frame(main_content_frame, width=200, relief="raised", borderwidth=1)
+        sidebar_frame.pack(side="left", fill="y", padx=(0, 20))
         sidebar_frame.pack_propagate(False)  # Prevent sidebar from resizing based on content
 
         ttk.Label(sidebar_frame, text="Navigation", font=("Helvetica", 12, "bold")).pack(pady=10)
@@ -91,11 +104,15 @@ class AdminLogic:
         btn_user_frame = ttk.Frame(self.central_content_frame)
         btn_user_frame.pack(pady=5)
 
-        ttk.Button(btn_user_frame, text="Add User", command=self.admin_add_user).pack(side="left", padx=5)
-        ttk.Button(btn_user_frame, text="Edit User", command=self.admin_edit_user).pack(side="left", padx=5)
-        ttk.Button(btn_user_frame, text="Delete User", command=self.admin_delete_user).pack(side="left", padx=5)
-        ttk.Button(btn_user_frame, text="Approve User", command=self.admin_approve_user).pack(side="left",
-                                                                                              padx=5)
+        ttk.Button(btn_user_frame, text="Add User", command=self.admin_add_user, style="Green.TButton").pack(
+            side="left", padx=5)
+        ttk.Button(btn_user_frame, text="Edit User", command=self.admin_edit_user, style="View.TButton").pack(
+            side="left", padx=5)
+        ttk.Button(btn_user_frame, text="Delete User", command=self.admin_delete_user, style="Yellow.TButton").pack(
+            side="left", padx=5)
+        ttk.Button(btn_user_frame, text="Approve User", command=self.admin_approve_user, style="Green.TButton").pack(
+            side="left", padx=5)
+
         self.load_users()
 
     def show_batch_management(self):
@@ -136,13 +153,14 @@ class AdminLogic:
         btn_batch_frame = ttk.Frame(self.central_content_frame)
         btn_batch_frame.pack(pady=5)
 
-        ttk.Button(btn_batch_frame, text="Approve Selected Batch", command=self.admin_approve_selected_batch).pack(
+        ttk.Button(btn_batch_frame, text="Approve Selected Batch", command=self.admin_approve_selected_batch,
+                   style="Green.TButton").pack(side="left", padx=5)
+        ttk.Button(btn_batch_frame, text="Reject Selected Batch", command=self.admin_reject_selected_batch,
+                   style="Orange.TButton").pack(side="left", padx=5)
+        ttk.Button(btn_batch_frame, text="View Samples", command=self.admin_view_samples_for_batch,
+                   style="View.TButton").pack(side="left", padx=5)
+        ttk.Button(btn_batch_frame, text="Delete Batch", command=self.delete_batch, style="Yellow.TButton").pack(
             side="left", padx=5)
-        ttk.Button(btn_batch_frame, text="Reject Selected Batch", command=self.admin_reject_selected_batch).pack(
-            side="left", padx=5)
-        ttk.Button(btn_batch_frame, text="View Samples", command=self.admin_view_samples_for_batch).pack(side="left",
-                                                                                                         padx=5)
-        ttk.Button(btn_batch_frame, text="Delete Batch", command=self.delete_batch).pack(side="left", padx=5)
 
         # Removed the "View Approved Batches" button here as well
         self.load_batches(self.batch_filter_var.get())  # Load batches based on initial filter value
@@ -253,14 +271,29 @@ class AdminLogic:
             else:
                 submission_date_str = str(submission_date_str) if submission_date_str is not None else ''
 
-            self.batches_tree.insert("", "end", iid=batch.id,
-                                     values=(data.get("batch_id", ""),
-                                             data.get("product_name", ""),
-                                             data.get("description", ""),
-                                             submission_date_str,
-                                             data.get("user_email", ""),
-                                             data.get("status", "pending approval"),
-                                             data.get("number_of_samples", 0)))
+            row_id = self.batches_tree.insert("", "end", iid=batch.id,
+                                              values=(data.get("batch_id", ""),
+                                                      data.get("product_name", ""),
+                                                      data.get("description", ""),
+                                                      submission_date_str,
+                                                      data.get("user_email", ""),
+                                                      data.get("status", "pending approval"),
+                                                      data.get("number_of_samples", 0)))
+
+            # Apply row tag based on status
+            status = data.get("status", "pending approval")
+            if status == "approved":
+                self.batches_tree.item(row_id, tags=("approved",))
+            elif status == "pending approval":
+                self.batches_tree.item(row_id, tags=("pending",))
+            elif status == "rejected":
+                self.batches_tree.item(row_id, tags=("rejected",))
+
+            # Define tag styles
+            self.batches_tree.tag_configure("approved", background="#d4edda")  # light green
+            self.batches_tree.tag_configure("pending", background="#fff3cd")  # light yellow
+            self.batches_tree.tag_configure("rejected", background="#f8d7da")  # light red/orange
+
         logging.info(f"--- AdminLogic: Batches loaded with filter: {status_filter} ---")
 
     def admin_approve_selected_batch(self):
@@ -405,9 +438,6 @@ class AdminLogic:
         btn_sample_frame = ttk.Frame(samples_window)
         btn_sample_frame.pack(pady=5)
 
-        ttk.Button(btn_sample_frame, text="Add Sample to Batch",
-                   command=lambda: self.sample_form_window(batch_id_from_doc, user_employee_id, samples_tree,
-                                                           product_name)).pack(side="left", padx=5)
         # New "Approve Sample" button
         ttk.Button(btn_sample_frame, text="Approve Sample",
                    command=lambda: self.admin_approve_sample(samples_tree, batch_doc_id)).pack(side="left", padx=5)
@@ -463,13 +493,6 @@ class AdminLogic:
                 sample_doc_ref.update({"status": "approved"})
                 messagebox.showinfo("Success", f"Sample '{sample_doc.get('sample_id')}' approved successfully.")
 
-                # Reload samples for the current batch view - need to get current page and items per page
-                # This needs to be adapted to fetch the current page context if this method can be called from multiple places
-                # For simplicity here, we'll assume it needs to reload the first page or the current page if context is available.
-                # Since this method is called from admin_view_samples_for_batch via lambda,
-                # we don't have direct access to page_label, current_page, items_per_page here.
-                # A robust solution would pass these down or manage state centrally.
-                # For now, a full reload of the main batch list is the safest side effect.
                 self.load_batches(self.batch_filter_var.get())
 
                 # Now, check if all samples in the batch are approved
@@ -615,7 +638,6 @@ class AdminLogic:
             if samples_found_on_page == 0 and total_samples > 0 and page_number > 1:
                 # This can happen if the last sample of a page was deleted, and the current page became empty.
                 # Or if navigated to an empty page (e.g. page 3 when only 2 pages exist).
-                # In such a case, navigate back to the last available page.
                 logging.info("No samples on current page, navigating to previous valid page.")
                 # Recursively call to go back one page. This needs careful handling to avoid infinite loops if no samples.
                 # The logic for total_pages and prev/next button state should prevent this for most cases.
@@ -628,103 +650,6 @@ class AdminLogic:
             messagebox.showerror("Error", f"Failed to load samples for batch: {e}")
             logging.error(f"Error loading samples: {e}", exc_info=True)
 
-    def sample_form_window(self, batch_id, user_employee_id_from_batch, samples_tree_ref, product_name):
-        """Opens a form to add a new sample to a specified batch."""
-        form_window = tk.Toplevel(self.root)
-        form_window.title(f"Add Sample to {product_name} ({batch_id})")
-        form_window.geometry("400x350")
-        form_window.transient(self.root)  # Make it appear on top of main window
-        form_window.grab_set()  # Make it modal
-
-        form_frame = ttk.Frame(form_window, padding="15")
-        form_frame.pack(fill="both", expand=True)
-
-        # Labels and Entry fields for sample details
-        ttk.Label(form_frame, text="Sample ID:").grid(row=0, column=0, padx=5, pady=5, sticky="w")
-        sample_id_entry = ttk.Entry(form_frame, width=30)
-        sample_id_entry.grid(row=0, column=1, padx=5, pady=5, sticky="ew")
-
-        ttk.Label(form_frame, text="Owner:").grid(row=1, column=0, padx=5, pady=5, sticky="w")
-        owner_entry = ttk.Entry(form_frame, width=30)
-        # Prefer pre-filling owner with the batch's user's username if available, otherwise current admin's username
-        if self.app.current_user:
-            if user_employee_id_from_batch:
-                user_doc = db.collection("users").where("employee_id", "==", user_employee_id_from_batch).limit(1).get()
-                if user_doc:
-                    owner_entry.insert(0, user_doc[0].to_dict().get("username", ""))
-                else:
-                    owner_entry.insert(0, self.app.current_user.get("username", ""))
-            else:
-                owner_entry.insert(0, self.app.current_user.get("username", ""))
-        owner_entry.grid(row=1, column=1, padx=5, pady=5, sticky="ew")
-
-        ttk.Label(form_frame, text="Maturation Date (YYYY-MM-DD):").grid(row=2, column=0, padx=5, pady=5, sticky="w")
-        maturation_date_entry = ttk.Entry(form_frame, width=30)
-        maturation_date_entry.grid(row=2, column=1, padx=5, pady=5, sticky="ew")
-
-        ttk.Label(form_frame, text="Status:").grid(row=3, column=0, padx=5, pady=5, sticky="w")
-        status_combobox = ttk.Combobox(form_frame, values=["pending approval", "approved", "rejected"],
-                                       state="readonly", width=28)
-        status_combobox.set("pending approval")  # Default status
-        status_combobox.grid(row=3, column=1, padx=5, pady=5, sticky="ew")
-
-        # Save Button
-        def save_sample_data():
-            s_id = sample_id_entry.get().strip()
-            owner = owner_entry.get().strip()
-            mat_date_str = maturation_date_entry.get().strip()
-            status = status_combobox.get().strip()
-
-            if not s_id or not owner or not mat_date_str:
-                messagebox.showerror("Input Error", "All fields are required.", parent=form_window)
-                return
-
-            try:
-                maturation_date = datetime.strptime(mat_date_str, "%Y-%m-%d")
-            except ValueError:
-                messagebox.showerror("Input Error", "Invalid Maturation Date format. Please useYYYY-MM-DD.",
-                                     parent=form_window)
-                return
-
-            # Determine submitted_by_employee_id
-            # Prefer the employee_id from the batch, otherwise use the current admin's employee_id
-            submitted_by_id = user_employee_id_from_batch
-            if not submitted_by_id and self.app.current_user:
-                submitted_by_id = self.app.current_user.get('employee_id', '')
-
-            if not submitted_by_id:
-                messagebox.showwarning("Warning",
-                                       "Could not determine employee ID for submission. Sample will be added without it.",
-                                       parent=form_window)
-
-            new_sample_data = {
-                "batch_id": batch_id,  # This is the crucial link to the batch
-                "sample_id": s_id,
-                "owner": owner,
-                "maturation_date": maturation_date,
-                "status": status,
-                "creation_date": datetime.now(),
-                "submitted_by_employee_id": submitted_by_id
-            }
-
-            try:
-                db.collection("samples").add(new_sample_data)
-                messagebox.showinfo("Success", "Sample added successfully!", parent=form_window)
-                # After adding a sample, need to reload the samples on the current page
-                # This requires passing the pagination context to this method or managing it globally
-                # For now, it will simply close the form and rely on a subsequent refresh if the user navigates
-                # If we want to refresh the *specific* samples window, we need to pass its page_label_ref, current_page etc.
-                # Simplest is to just reload the main batches tree if a sample is added/modified.
-                self.load_batches(self.batch_filter_var.get())
-                form_window.destroy()  # Close the form window
-            except Exception as e:
-                messagebox.showerror("Error", f"Failed to add sample: {e}", parent=form_window)
-
-        save_button = ttk.Button(form_frame, text="Save Sample", command=save_sample_data)
-        save_button.grid(row=4, column=0, columnspan=2, pady=10)
-
-        form_window.wait_window()  # Wait for the form window to close
-
     def delete_batch(self):
         """Deletes a selected batch and all its associated samples from Firestore."""
         logging.info("Starting delete_batch process.")
@@ -735,15 +660,6 @@ class AdminLogic:
             return
 
         item = self.batches_tree.item(selected[0])  # Changed self.tree to self.batches_tree
-        # Ensure the selected item is actually a batch. Check if BatchID column is visible.
-        # This is a heuristic; a more robust way would be to check self.last_loaded_query_type
-        # Assuming that the first item in values is the document ID and the fifth is the visible BatchID.
-        # This part requires careful alignment with how batches are loaded into the treeview.
-        # The column check for "BatchID" option="width" == 0 might not be reliable here,
-        # it's better to rely on the context of which treeview is being displayed.
-        # Since this is in admin_logic and targets batches_tree, it's safer to assume it's a batch.
-
-        # DocID for batches is in item['values'][0] if that's how it's inserted.
         # In current load_batches, item.id is the firestore document ID.
         firestore_batch_doc_id = selected[0]  # Use the iid from selection as Firestore document ID
         # The displayed BatchID is typically the first value in the treeview's values tuple
@@ -800,6 +716,12 @@ class AdminLogic:
 
     def export_user_batches(self):
         """Exports approved batches and their associated samples to an Excel file."""
+        # Add confirmation dialog here
+        confirm = messagebox.askyesno("Confirm Export",
+                                      "Are you sure you want to export all approved batch data to Excel?")
+        if not confirm:
+            return  # User cancelled the export
+            
         logging.info("Attempting to export approved batches and samples to Excel.")
         approved_batches_data = []
         batches_ref = db.collection("batches")
@@ -884,3 +806,5 @@ class AdminLogic:
             except Exception as e:
                 logging.error(f"Failed to export Excel file for approved batches: {e}", exc_info=True)
                 messagebox.showerror("Error", f"Failed to export Excel file:\n{e}")
+
+
