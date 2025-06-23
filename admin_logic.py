@@ -51,8 +51,6 @@ class AdminLogic:
         top_frame.pack(fill="x", padx=10, pady=10)
 
         ttk.Button(top_frame, text="Logout", command=self.app.logout).pack(side="right")
-        ttk.Label(top_frame, text=f"Welcome, Admin {self.app.current_user.get('username')}!",
-                  font=("Helvetica", 16)).pack(side="left", expand=True) # Added welcome message
 
         # Main content frame to hold sidebar and central content
         main_content_frame = ttk.Frame(self.root)
