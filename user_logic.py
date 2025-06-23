@@ -326,7 +326,6 @@ class UserLogic:
                     df[col] = None
             
             self.app.data = df
-
             # Insert data into the Treeview
             for index, row in df.iterrows():
                 mat_date_str = "N/A"
@@ -1164,6 +1163,7 @@ class UserLogic:
 
                 df_for_export_final.to_excel(filename, index=False)
                 self.status_label.config(text=f"Data exported to {os.path.basename(filename)}")
+                messagebox.showinfo("Export Successful", f"Data successfully exported to {os.path.basename(filename)}.") # Success message
                 logging.info(f"Successfully exported data to {filename}.")
             except Exception as e:
                 logging.error(f"Failed to export Excel file: {e}", exc_info=True)
@@ -1453,7 +1453,14 @@ class UserLogic:
                 if not existing_batch_doc.exists:
                     messagebox.showerror("Error", "Selected batch does not exist in the database.")
                     logging.error(f"Selected batch ID '{selected_batch_id}' not found in database.")
-                    return
+                    # Refresh current view if sample not found
+                    if self.last_loaded_query_type in ['all_samples', 'my_samples']:
+                        self.load_samples_paginated(self.last_loaded_query_type, reset=False)
+                    elif self.last_loaded_query_type == 'current_batch_samples' and self.current_selected_batch_id:
+                        self.load_samples_for_current_batch(reset=False)
+                    else:
+                        self.load_samples_paginated(query_type='all_samples', reset=True)
+                return
 
                 self.current_selected_batch_id = selected_batch_id
                 # Load samples for the existing batch
@@ -2136,7 +2143,7 @@ class UserLogic:
         elif self.filter_mode.get() == "batch_search":
             self.batch_search_frame.pack(fill="both", expand=True, padx=10, pady=10)
             logging.info("Switched to Batch Search mode.")
-        elif self.filter_mode.get() == "sample_search": # Handle new sample search mode
+        elif self.filter_mode.get() == "sample_search": # New: Handle sample search mode
             self.sample_search_frame.pack(fill="both", expand=True, padx=10, pady=10)
             logging.info("Switched to Sample Search mode.")
 
@@ -2551,5 +2558,3 @@ class UserLogic:
         self.load_samples_paginated(query_type='all_samples', reset=True)
         form_window.destroy()
         logging.info("Filters cleared and all samples reloaded.")
-
-
