@@ -1,4 +1,3 @@
-# user_logic.py
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
 from datetime import datetime, timedelta
@@ -956,7 +955,7 @@ class UserLogic:
         new_batch_id = f"batch_{self.app.current_user['employee_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
         if db.collection("batches").document(new_batch_id).get().exists:
             messagebox.showerror("Error", "Generated Batch ID already exists. Please try again.")
-            logging.error(f"Generated batch ID '{new_batch_id}' already exists.")
+            logging.error("Generated batch ID already exists.")
             return
 
         new_batch_data = {
@@ -1460,7 +1459,7 @@ class UserLogic:
                         self.load_samples_for_current_batch(reset=False)
                     else:
                         self.load_samples_paginated(query_type='all_samples', reset=True)
-                return
+                    return # Exit the function here as the batch was not found.
 
                 self.current_selected_batch_id = selected_batch_id
                 # Load samples for the existing batch
@@ -2019,6 +2018,8 @@ class UserLogic:
         self.filter_start_date_entry = DateEntry(self.maturation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
         self.filter_start_date_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=5)
         self.filter_start_date_entry.set_date(datetime.now().date())
+        # The below line was causing an issue with `DateEntry` if `DateEntry` was not yet initialized.
+        # It's been moved inside `_toggle_maturation_filter_state` which is called after `DateEntry` is initialized.
 
         ttk.Label(self.maturation_date_filter_frame, text="To (YYYY-MM-DD):", style='TLabel').grid(row=1, column=0, sticky="e", pady=5, padx=5)
         self.filter_end_date_entry = DateEntry(self.maturation_date_filter_frame, width=28, background='darkblue', foreground='white', borderwidth=2, date_pattern='yyyy-mm-dd')
