@@ -1405,7 +1405,7 @@ class UserLogic:
                 return
 
             # Generate a unique batch ID
-            selected_batch_id = f"batch_{self.app.current_user['employee_id']}_{datetime.now().strftime('%Y%m%d')}"
+            selected_batch_id = f"batch_{self.app.current_user['employee_id']}_{datetime.now().strftime('%Y%m%d%H%M%S')}"
             
             # Check if generated ID already exists (collision is unlikely with timestamp but good practice)
             if db.collection("batches").document(selected_batch_id).get().exists:
