@@ -9,7 +9,9 @@ import firebase_admin
 
 # --- Logging Setup ---
 import logging
+
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+
 # --- End Logging Setup ---
 
 class AdminLogic:
@@ -64,7 +66,8 @@ class AdminLogic:
                                                                                                   padx=10)
         ttk.Button(sidebar_frame, text="Batch Management", command=self.show_batch_management).pack(fill="x", pady=5,
                                                                                                     padx=10)
-        ttk.Button(sidebar_frame, text="Export Approved Data", command=self.export_user_batches).pack(fill="x", pady=5, padx=10)
+        ttk.Button(sidebar_frame, text="Export Approved Data", command=self.export_user_batches).pack(fill="x", pady=5,
+                                                                                                      padx=10)
 
         # Central content area
         self.central_content_frame = ttk.Frame(main_content_frame)
@@ -160,6 +163,9 @@ class AdminLogic:
         ttk.Button(btn_batch_frame, text="View Samples", command=self.admin_view_samples_for_batch,
                    style="View.TButton").pack(side="left", padx=5)
         ttk.Button(btn_batch_frame, text="Delete Batch", command=self.delete_batch, style="Yellow.TButton").pack(
+            side="left", padx=5)
+        # add edit batch
+        ttk.Button(btn_batch_frame, text="Edit Batch", command=self.edit_batch_info, style="Yellow.TButton").pack(
             side="left", padx=5)
 
         # Removed the "View Approved Batches" button here as well
@@ -714,6 +720,64 @@ class AdminLogic:
             logging.error(f"Failed to delete batch '{batch_id_display}': {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to delete batch and its samples:\n{e}")
 
+    #Add edit_batch
+    def edit_batch_info(self):
+        """Opens a form to edit the product name and description of a selected batch."""
+        selected = self.batches_tree.selection()
+        if not selected:
+            messagebox.showinfo("Info", "Please select a batch to edit.")
+            return
+
+        batch_doc_id = selected[0]
+        batch_doc = db.collection("batches").document(batch_doc_id).get()
+
+        if not batch_doc.exists:
+            messagebox.showerror("Error", "Selected batch not found.")
+            return
+
+        batch_data = batch_doc.to_dict()
+
+        edit_window = tk.Toplevel(self.root)
+        edit_window.title(f"Edit Batch: {batch_data.get('batch_id')}")
+        edit_window.geometry("400x250")
+        edit_window.transient(self.root)  # Make it appear on top of the main window
+        edit_window.grab_set()  # Make it modal
+
+        # Product Name
+        ttk.Label(edit_window, text="Product Name:").pack(pady=5)
+        product_name_entry = ttk.Entry(edit_window, width=40)
+        product_name_entry.pack(pady=5)
+        product_name_entry.insert(0, batch_data.get("product_name", ""))
+
+        # Description
+        ttk.Label(edit_window, text="Description:").pack(pady=5)
+        description_text = tk.Text(edit_window, width=30, height=5)
+        description_text.pack(pady=5)
+        description_text.insert("1.0", batch_data.get("description", ""))
+
+        def save_changes():
+            new_product_name = product_name_entry.get().strip()
+            new_description = description_text.get("1.0", tk.END).strip()
+
+            if not new_product_name:
+                messagebox.showwarning("Input Error", "Product Name cannot be empty.")
+                return
+
+            try:
+                db.collection("batches").document(batch_doc_id).update({
+                    "product_name": new_product_name,
+                    "description": new_description
+                })
+                messagebox.showinfo("Success", "Batch information updated successfully.")
+                edit_window.destroy()
+                self.load_batches(self.batch_filter_var.get())  # Refresh batches tree
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to update batch information: {e}")
+
+        ttk.Button(edit_window, text="Save Changes", command=save_changes, style="Green.TButton").pack(pady=10)
+
+
+
     def export_user_batches(self):
         """Exports approved batches and their associated samples to an Excel file."""
         # Add confirmation dialog here
@@ -721,7 +785,7 @@ class AdminLogic:
                                       "Are you sure you want to export all approved batch data to Excel?")
         if not confirm:
             return  # User cancelled the export
-            
+
         logging.info("Attempting to export approved batches and samples to Excel.")
         approved_batches_data = []
         batches_ref = db.collection("batches")
@@ -806,5 +870,3 @@ class AdminLogic:
             except Exception as e:
                 logging.error(f"Failed to export Excel file for approved batches: {e}", exc_info=True)
                 messagebox.showerror("Error", f"Failed to export Excel file:\n{e}")
-
-
