@@ -5,7 +5,6 @@ from firebase_setup import db
 from helpers import validate_email, validate_password, validate_employee_id
 from constants import MIN_PASSWORD_LENGTH
 
-
 class AuthManager:
     def __init__(self, root, app_instance):
         self.root = root
@@ -282,15 +281,15 @@ class AuthManager:
         else:
             role_combobox.current(0)
 
-            # New: Status field
-            ttk.Label(frame, text="Status:").grid(row=5, column=0, sticky="e", pady=5)
-            status_combobox = ttk.Combobox(frame, values=["pending", "active"], state="readonly", width=27)
-            status_combobox.grid(row=5, column=1, sticky="ew", pady=5)
-            if user_data:
-                status_combobox.set(user_data.get("status", "pending"))
-            else:
-                status_combobox.current(0)  # Default to pending for new users
-            # End New
+        # New: Status field - Moved outside the 'else' block
+        ttk.Label(frame, text="Status:").grid(row=5, column=0, sticky="e", pady=5)
+        status_combobox = ttk.Combobox(frame, values=["pending", "active"], state="readonly", width=27)
+        status_combobox.grid(row=5, column=1, sticky="ew", pady=5)
+        if user_data:
+            status_combobox.set(user_data.get("status", "pending"))
+        else:
+            status_combobox.current(0)  # Default to pending for new users
+        # End New
 
         def submit():
             current_employee_id = employee_id_entry.get().strip()
@@ -298,7 +297,7 @@ class AuthManager:
             email = email_entry.get().strip()
             password = password_entry.get().strip()
             role = role_combobox.get().strip().lower()
-            status = status_combobox.get().strip().lower()  # New: Retrieve status
+            status = status_combobox.get().strip().lower()  # This line will now find status_combobox
 
             # --- Validation ---
             if not user_id:
@@ -360,7 +359,7 @@ class AuthManager:
                 "email": email,
                 "password": password,
                 "role": role,
-                "status": "active" if role == "admin" else "pending"# New: Include status in user_obj
+                "status": status # Use the retrieved status from the combobox
             }
 
             try:
