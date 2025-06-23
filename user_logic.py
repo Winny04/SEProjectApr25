@@ -326,7 +326,6 @@ class UserLogic:
                     df[col] = None
             
             self.app.data = df
-
             # Insert data into the Treeview
             for index, row in df.iterrows():
                 mat_date_str = "N/A"
@@ -1164,6 +1163,7 @@ class UserLogic:
 
                 df_for_export_final.to_excel(filename, index=False)
                 self.status_label.config(text=f"Data exported to {os.path.basename(filename)}")
+                messagebox.showinfo("Export Successful", f"Data successfully exported to {os.path.basename(filename)}.") # Success message
                 logging.info(f"Successfully exported data to {filename}.")
             except Exception as e:
                 logging.error(f"Failed to export Excel file: {e}", exc_info=True)
@@ -1453,7 +1453,14 @@ class UserLogic:
                 if not existing_batch_doc.exists:
                     messagebox.showerror("Error", "Selected batch does not exist in the database.")
                     logging.error(f"Selected batch ID '{selected_batch_id}' not found in database.")
-                    return
+                    # Refresh current view if sample not found
+                    if self.last_loaded_query_type in ['all_samples', 'my_samples']:
+                        self.load_samples_paginated(self.last_loaded_query_type, reset=False)
+                    elif self.last_loaded_query_type == 'current_batch_samples' and self.current_selected_batch_id:
+                        self.load_samples_for_current_batch(reset=False)
+                    else:
+                        self.load_samples_paginated(query_type='all_samples', reset=True)
+                return
 
                 self.current_selected_batch_id = selected_batch_id
                 # Load samples for the existing batch
@@ -2136,7 +2143,7 @@ class UserLogic:
         elif self.filter_mode.get() == "batch_search":
             self.batch_search_frame.pack(fill="both", expand=True, padx=10, pady=10)
             logging.info("Switched to Batch Search mode.")
-        elif self.filter_mode.get() == "sample_search": # Handle new sample search mode
+        elif self.filter_mode.get() == "sample_search": # New: Handle sample search mode
             self.sample_search_frame.pack(fill="both", expand=True, padx=10, pady=10)
             logging.info("Switched to Sample Search mode.")
 
@@ -2551,74 +2558,3 @@ class UserLogic:
         self.load_samples_paginated(query_type='all_samples', reset=True)
         form_window.destroy()
         logging.info("Filters cleared and all samples reloaded.")
-
-    def delete_batch(self):
-        """Deletes a selected batch and all its associated samples from Firestore."""
-        logging.info("Starting delete_batch process.")
-        selected = self.tree.selection()
-        if not selected:
-            messagebox.showinfo("Info", "Please select a batch to delete.")
-            logging.warning("Delete batch aborted: No batch selected.")
-            return
-
-        item = self.tree.item(selected[0])
-        # Ensure the selected item is actually a batch based on `last_loaded_query_type`
-        if self.last_loaded_query_type not in ['batches', 'my_batches', 'todays_batches']:
-            messagebox.showwarning("Warning", "Please select a batch to delete (currently displaying samples or unknown data type).")
-            logging.warning("Selected item is not a batch. Delete batch aborted.")
-            return
-
-        firestore_batch_doc_id = item['values'][0]
-        # BatchID is at index 5 in the Treeview values for batches
-        batch_id_display = item['values'][5]
-
-        logging.info(f"Attempting to delete batch: DocID='{firestore_batch_doc_id}', BatchID='{batch_id_display}'")
-
-        confirm = messagebox.askyesno("Confirm Delete Batch",
-                                      f"Are you sure you want to delete Batch '{batch_id_display}'?\n\n"
-                                      "This will PERMANENTLY DELETE ALL SAMPLES associated with this batch as well. This action cannot be undone.")
-        if not confirm:
-            logging.info("Delete batch aborted: User cancelled.")
-            return
-
-        try:
-            batch_write = db.batch()
-
-            # Delete all samples associated with this batch
-            samples_to_delete = db.collection("samples").where("batch_id", "==", batch_id_display).stream()
-            deleted_samples_count = 0
-            for sample_doc in samples_to_delete:
-                batch_write.delete(sample_doc.reference)
-                deleted_samples_count += 1
-            logging.info(f"Prepared to delete {deleted_samples_count} samples for batch '{batch_id_display}'.")
-
-            # Delete the batch document itself
-            batch_doc_ref = db.collection("batches").document(firestore_batch_doc_id)
-            batch_write.delete(batch_doc_ref)
-            logging.info(f"Prepared to delete batch document: {firestore_batch_doc_id}.")
-
-            batch_write.commit()
-            logging.info("Firestore batch committed successfully (batch and samples deleted).")
-
-            messagebox.showinfo("Success", f"Batch '{batch_id_display}' and its {deleted_samples_count} associated samples deleted successfully.")
-            logging.info(f"Batch '{batch_id_display}' and its samples deleted.")
-
-            # Refresh the Treeview to reflect the deletion
-            if self.last_loaded_query_type == 'batches':
-                self.load_all_batches_to_tree()
-            elif self.last_loaded_query_type == 'my_batches':
-                self.load_my_batches_to_tree()
-            elif self.last_loaded_query_type == 'todays_batches':
-                self.load_todays_batches_to_tree()
-            else:
-                self.load_all_batches_to_tree()
-            
-            if hasattr(self.app, 'admin_logic'):
-                self.app.admin_logic.load_batches()
-                
-            logging.info("Batch data reloaded and tree refreshed after deletion.")
-
-        except Exception as e:
-            logging.error(f"Failed to delete batch '{batch_id_display}': {e}", exc_info=True)
-            messagebox.showerror("Error", f"Failed to delete batch and its samples:\n{e}")
-
