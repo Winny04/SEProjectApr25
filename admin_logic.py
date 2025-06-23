@@ -12,7 +12,6 @@ import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-
 # --- End Logging Setup ---
 
 class AdminLogic:
@@ -53,7 +52,7 @@ class AdminLogic:
 
         ttk.Button(top_frame, text="Logout", command=self.app.logout).pack(side="right")
         ttk.Label(top_frame, text=f"Welcome, Admin {self.app.current_user.get('username')}!",
-                  font=("Helvetica", 16)).pack(side="left", expand=True)  # Added welcome message
+                  font=("Helvetica", 16)).pack(side="left", expand=True) # Added welcome message
 
         # Main content frame to hold sidebar and central content
         main_content_frame = ttk.Frame(self.root)
@@ -197,8 +196,7 @@ class AdminLogic:
                 self.users_tree.insert("", "end", iid=user.id,
                                        values=(data.get("employee_id"), data.get("username", ""),
                                                data.get("email"), data.get("role"),
-                                               data.get("status",
-                                                        "active" if data.get("role") == "admin" else "pending")))
+                                               data.get("status", "active" if data.get("role") == "admin" else "pending")))
             logging.info("Users loaded successfully.")
         except Exception as e:
             logging.error(f"Failed to load users: {e}", exc_info=True)
@@ -380,8 +378,7 @@ class AdminLogic:
                 logging.info(f"Prepared to set batch {batch_doc_id} status to 'approved'.")
 
                 # Also approve all samples associated with this batch
-                associated_samples = db.collection("samples").where("batch_id", "==", batch_data.get(
-                    'batch_id')).stream()  # Use batch_id field
+                associated_samples = db.collection("samples").where("batch_id", "==", batch_data.get('batch_id')).stream() # Use batch_id field
                 samples_updated_count = 0
                 for sample in associated_samples:
                     batch_write.update(sample.reference, {"status": "approved"})
@@ -432,8 +429,7 @@ class AdminLogic:
                 logging.info(f"Prepared to set batch {batch_doc_id} status to 'rejected'.")
 
                 # Also reject all samples associated with this batch
-                associated_samples = db.collection("samples").where("batch_id", "==", batch_data.get(
-                    'batch_id')).stream()  # Use batch_id field
+                associated_samples = db.collection("samples").where("batch_id", "==", batch_data.get('batch_id')).stream() # Use batch_id field
                 samples_updated_count = 0
                 for sample in associated_samples:
                     batch_write.update(sample.reference, {"status": "rejected"})
@@ -565,17 +561,13 @@ class AdminLogic:
 
         try:
             # Find the Firestore document ID for the selected sample using its sample_id and batch_id
-            sample_query = db.collection("samples").where("sample_id", "==", sample_id_from_tree).where("batch_id",
-                                                                                                        "==",
-                                                                                                        self._get_batch_id_from_doc_id(
-                                                                                                            batch_doc_id)).limit(
-                # Use the actual batch_id string from the batch document
+            sample_query = db.collection("samples").where("sample_id", "==", sample_id_from_tree).where("batch_id", "==",
+                                                                                                        self._get_batch_id_from_doc_id(batch_doc_id)).limit( # Use the actual batch_id string from the batch document
                 1).get()
 
             if not sample_query:
                 messagebox.showerror("Error", "Selected sample not found in database.")
-                logging.error(
-                    f"Sample with display ID {sample_id_from_tree} not found in database for batch document ID {batch_doc_id}.")
+                logging.error(f"Sample with display ID {sample_id_from_tree} not found in database for batch document ID {batch_doc_id}.")
                 return
 
             sample_doc_ref = sample_query[0].reference
@@ -594,14 +586,12 @@ class AdminLogic:
                 messagebox.showinfo("Success", f"Sample '{sample_doc.get('sample_id')}' approved successfully.")
                 logging.info(f"Sample {sample_id_from_tree} approved successfully.")
 
-                self.load_batches(self.batch_filter_var.get())  # Reload main batches tree
+                self.load_batches(self.batch_filter_var.get()) # Reload main batches tree
 
                 # Now, check if all samples in the batch are approved
                 all_samples_approved = True
                 # Use the actual batch_id field for querying samples
-                associated_samples_in_batch = db.collection("samples").where("batch_id", "==",
-                                                                             self._get_batch_id_from_doc_id(
-                                                                                 batch_doc_id)).stream()
+                associated_samples_in_batch = db.collection("samples").where("batch_id", "==", self._get_batch_id_from_doc_id(batch_doc_id)).stream()
 
                 # Check for samples in the generator before iterating
                 samples_exist = False
@@ -611,19 +601,16 @@ class AdminLogic:
                     temp_samples_list.append(s)  # Store to iterate again if needed
 
                 if samples_exist:
-                    logging.debug(
-                        f"Checking {len(temp_samples_list)} samples for batch {self._get_batch_id_from_doc_id(batch_doc_id)}.")
+                    logging.debug(f"Checking {len(temp_samples_list)} samples for batch {self._get_batch_id_from_doc_id(batch_doc_id)}.")
                     for s in temp_samples_list:
                         s_data = s.to_dict()
                         if s_data.get("status") != "approved":
                             all_samples_approved = False
-                            logging.debug(
-                                f"Sample {s_data.get('sample_id')} is not approved. Batch cannot be fully approved.")
+                            logging.debug(f"Sample {s_data.get('sample_id')} is not approved. Batch cannot be fully approved.")
                             break  # Found a pending or rejected sample, no need to check further
                 else:  # If no samples exist, it cannot be 'all approved'
                     all_samples_approved = False
-                    logging.info(
-                        f"No samples found for batch {self._get_batch_id_from_doc_id(batch_doc_id)}. Batch status will not be set to 'approved'.")
+                    logging.info(f"No samples found for batch {self._get_batch_id_from_doc_id(batch_doc_id)}. Batch status will not be set to 'approved'.")
 
                 batch_ref = db.collection("batches").document(batch_doc_id)
                 current_batch_status = batch_ref.get().to_dict().get("status")
@@ -633,25 +620,21 @@ class AdminLogic:
                         batch_ref.update({"status": "approved"})
                         messagebox.showinfo("Batch Status Update",
                                             f"Batch '{self._get_batch_id_from_doc_id(batch_doc_id)}' status updated to 'approved' as all samples are approved.")
-                        logging.info(
-                            f"Batch {self._get_batch_id_from_doc_id(batch_doc_id)} status updated to 'approved'.")
+                        logging.info(f"Batch {self._get_batch_id_from_doc_id(batch_doc_id)} status updated to 'approved'.")
                         self.load_batches(self.batch_filter_var.get())  # Refresh the main batches tree
-                elif not all_samples_approved and current_batch_status == "approved":  # If it was approved, but now a sample is not, revert
+                elif not all_samples_approved and current_batch_status == "approved": # If it was approved, but now a sample is not, revert
                     batch_ref.update({"status": "pending approval"})
                     messagebox.showinfo("Batch Status Update",
                                         f"Batch '{self._get_batch_id_from_doc_id(batch_doc_id)}' status updated to 'pending approval' as some samples are not yet approved.")
-                    logging.info(
-                        f"Batch {self._get_batch_id_from_doc_id(batch_doc_id)} status reverted to 'pending approval'.")
+                    logging.info(f"Batch {self._get_batch_id_from_doc_id(batch_doc_id)} status reverted to 'pending approval'.")
                     self.load_batches(self.batch_filter_var.get())  # Refresh the main batches tree
                 else:
-                    logging.info(
-                        f"Batch {self._get_batch_id_from_doc_id(batch_doc_id)} status remains '{current_batch_status}' as not all samples are approved or no samples exist.")
+                    logging.info(f"Batch {self._get_batch_id_from_doc_id(batch_doc_id)} status remains '{current_batch_status}' as not all samples are approved or no samples exist.")
 
             else:
                 logging.info("Approve sample cancelled by user.")
         except Exception as e:
-            logging.error(f"Failed to approve sample or update batch status for sample {sample_id_from_tree}: {e}",
-                          exc_info=True)
+            logging.error(f"Failed to approve sample or update batch status for sample {sample_id_from_tree}: {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to approve sample or update batch status: {e}")
 
     def admin_reject_sample(self, samples_tree_ref, batch_doc_id):
@@ -667,11 +650,8 @@ class AdminLogic:
         sample_id_from_tree = sample_tree_data[0]
 
         try:
-            sample_query = db.collection("samples").where("sample_id", "==", sample_id_from_tree).where("batch_id",
-                                                                                                        "==",
-                                                                                                        self._get_batch_id_from_doc_id(
-                                                                                                            batch_doc_id)).limit(
-                # Use the actual batch_id string
+            sample_query = db.collection("samples").where("sample_id", "==", sample_id_from_tree).where("batch_id", "==",
+                                                                                                        self._get_batch_id_from_doc_id(batch_doc_id)).limit( # Use the actual batch_id string
                 1).get()
 
             if not sample_query:
@@ -702,14 +682,12 @@ class AdminLogic:
                     batch_ref.update({"status": "pending approval"})
                     messagebox.showinfo("Batch Status Update",
                                         f"Batch '{self._get_batch_id_from_doc_id(batch_doc_id)}' status updated to 'pending approval' as a sample was rejected.")
-                    logging.info(
-                        f"Batch {self._get_batch_id_from_doc_id(batch_doc_id)} status updated to 'pending approval' due to sample rejection.")
+                    logging.info(f"Batch {self._get_batch_id_from_doc_id(batch_doc_id)} status updated to 'pending approval' due to sample rejection.")
                     self.load_batches(self.batch_filter_var.get())
             else:
                 logging.info("Reject sample cancelled by user.")
         except Exception as e:
-            logging.error(f"Failed to reject sample or update batch status for sample {sample_id_from_tree}: {e}",
-                          exc_info=True)
+            logging.error(f"Failed to reject sample or update batch status for sample {sample_id_from_tree}: {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to reject sample or update batch status: {e}")
 
     def _load_samples_into_tree(self, batch_id, samples_tree, page_label_ref, page_number, items_per_page):
@@ -745,15 +723,14 @@ class AdminLogic:
             start_index = (page_number - 1) * items_per_page
             end_index = start_index + items_per_page
             paginated_samples = all_samples[start_index:end_index]
-            logging.debug(
-                f"Slicing samples from index {start_index} to {end_index}. Fetched {len(paginated_samples)} for current page.")
+            logging.debug(f"Slicing samples from index {start_index} to {end_index}. Fetched {len(paginated_samples)} for current page.")
+
 
             samples_found_on_page = 0
             for sample in paginated_samples:
                 samples_found_on_page += 1
                 sample_data = sample.to_dict()
-                logging.debug(
-                    f"  Found sample: {sample_data.get('sample_id')}, batch_id: {sample_data.get('batch_id')}")
+                logging.debug(f"  Found sample: {sample_data.get('sample_id')}, batch_id: {sample_data.get('batch_id')}")
 
                 maturation_date_str = ""
                 if isinstance(sample_data.get('maturation_date'), datetime):
@@ -777,7 +754,7 @@ class AdminLogic:
                                             maturation_date_str,
                                             sample_data.get("status", ""),
                                             creation_date_str))
-
+            
             if samples_found_on_page == 0 and total_samples > 0 and page_number > 1:
                 logging.info("No samples on current page, navigating to previous valid page recursively.")
                 page_label_ref.master.master.current_page = max(1, page_number - 1)
@@ -859,7 +836,7 @@ class AdminLogic:
             logging.error(f"Failed to delete batch '{batch_id_display}': {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to delete batch and its samples:\n{e}")
 
-    # Add edit_batch
+    #Add edit_batch
     def edit_batch_info(self):
         """Opens a form to edit the product name and description of a selected batch."""
         logging.info("Attempting to open edit batch form.")
@@ -923,12 +900,13 @@ class AdminLogic:
                     messagebox.showerror("Error", f"Failed to update batch information: {e}")
 
             ttk.Button(edit_window, text="Save Changes", command=save_changes, style="Green.TButton").pack(pady=10)
-            edit_window.protocol("WM_DELETE_WINDOW", edit_window.destroy)  # Ensure window closes properly
+            edit_window.protocol("WM_DELETE_WINDOW", edit_window.destroy) # Ensure window closes properly
             logging.info(f"Edit batch form for {batch_doc_id} displayed.")
 
         except Exception as e:
             logging.error(f"Failed to open edit batch form for {batch_doc_id}: {e}", exc_info=True)
             messagebox.showerror("Error", f"Failed to open edit batch form: {e}")
+
 
     def export_user_batches(self):
         """Exports approved batches and their associated samples to an Excel file."""
@@ -969,13 +947,13 @@ class AdminLogic:
                         "product_name": batch_data.get("product_name", ""),
                         "batch_description": batch_data.get("description", ""),
                         "batch_status": batch_data.get("status", ""),
-                        "user_employee_id": batch_data.get("user_employee_id", ""),  # Added employee ID to export
+                        "user_employee_id": batch_data.get("user_employee_id", ""), # Added employee ID to export
                         "user_email": batch_data.get("user_email", ""),
                         "sample_id": "",
                         "sample_owner": "",
                         "sample_maturation_date": "",
                         "sample_status": "",
-                        "sample_creation_date": ""  # Added sample creation date
+                        "sample_creation_date": "" # Added sample creation date
                     }
                     approved_batches_data.append(combined_data)
 
@@ -997,21 +975,21 @@ class AdminLogic:
                     elif isinstance(sample_creation_date_obj, firebase_admin.firestore.Timestamp):
                         creation_date_str = sample_creation_date_obj.to_datetime().strftime("%Y-%m-%d %H:%M:%S")
                     else:
-                        creation_date_str = str(
-                            sample_creation_date_obj) if sample_creation_date_obj is not None else ''
+                        creation_date_str = str(sample_creation_date_obj) if sample_creation_date_obj is not None else ''
+
 
                     combined_data = {
                         "batch_id": batch_data.get("batch_id", ""),
                         "product_name": batch_data.get("product_name", ""),
                         "batch_description": batch_data.get("description", ""),
                         "batch_status": batch_data.get("status", ""),
-                        "user_employee_id": batch_data.get("user_employee_id", ""),  # Added employee ID to export
+                        "user_employee_id": batch_data.get("user_employee_id", ""), # Added employee ID to export
                         "user_email": batch_data.get("user_email", ""),
                         "sample_id": sample_data.get("sample_id", ""),
                         "sample_owner": sample_data.get("owner", ""),
                         "sample_maturation_date": mat_date_str,
                         "sample_status": sample_data.get("status", ""),
-                        "sample_creation_date": creation_date_str  # Added sample creation date
+                        "sample_creation_date": creation_date_str # Added sample creation date
                     }
                     approved_batches_data.append(combined_data)
 
