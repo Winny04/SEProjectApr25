@@ -1,4 +1,4 @@
-YouTube video link:
+Video Presentation YouTube Link:
 https://youtu.be/FKWnS6Doy4Y 
 
 ALL the files are needed in order to run GUI.
@@ -11,5 +11,5 @@ Service account file from firebase. *(each person has their own private key)*
 
 RUN MAIN_APP.py
 
-YouTube video link:
+Video Presentation YouTube Link:
 https://youtu.be/FKWnS6Doy4Y
